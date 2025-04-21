@@ -1,4 +1,4 @@
-# FetchFund - AI-Powered Crypto Manging Fund
+# FetchFund - AI-Powered Crypto Management Fund
 
 A web application that leverages Fetch.ai agents to analyze cryptocurrency market conditions, provide trading recommendations, and execute it.
 
