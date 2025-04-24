@@ -1,4 +1,5 @@
-#agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7
+#agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7 agentverse
+#agent1qgdm8dzunh35h5wpa6c06rx5zuuztta2nyl8cnm8ncpr4l6hva9x6ewg8rm localhost
 from logging import Logger
 import logging
 import random
@@ -9,6 +10,7 @@ from dotenv import load_dotenv
 import argparse
 import time
 import asyncio
+import contextlib
 
 from uagents import Agent, Context, Protocol, Model, Field
 from uagents.config import TESTNET_REGISTRATION_FEE
@@ -23,6 +25,7 @@ from cosmpy.crypto.address import Address
 from cosmpy.aerial.config import NetworkConfig
 from cosmpy.aerial.wallet import LocalWallet
 
+loop = asyncio.get_event_loop()
 
 class TopupRequest(Model):
     amount: float
@@ -34,7 +37,7 @@ class TopupResponse(Model):
  
 
 #load_dotenv()
-TOPUP_SEED = ""
+TOPUP_SEED = "" #ADD SEED HERE
 #AUTOAGENT_SEED = "this is just test listen up this is test"
 
 farmer = Agent(
@@ -61,45 +64,48 @@ async def introduce_agent(ctx: Context):
     #    ctx.logger.info(f"Hello, I'm agent {ctx.agent.name} and I am starting up")
 
 
-    
 
 
 #need to add some pause before starting
-@farmer.on_interval(36000)
-async def get_faucet_farmer(ctx: Context):
-
-    ledger: LedgerClient = get_ledger()#"mainnet"
-    faucet: FaucetApi = get_faucet()
-    #fund_agent_if_low(farmer.wallet.address())
-    faucet.get_wealth(farmer.wallet.address())
-    agent_balance = ledger.query_bank_balance(Address(farmer.wallet.address()))
-    converted_balance = agent_balance/ONETESTFET
-    
-    #logging.info(f"Received: {converted_balance} TESTFET")
-    ctx.logger.info(f"Received: {converted_balance} TESTFET")
-
-    #ctx.logger.info({agent_balance})
-    
-    #staking letsgooo
-    #ledger_client = LedgerClient(NetworkConfig.fetchai_stable_testnet())
-    #faucet_api = FaucetApi(NetworkConfig.fetchai_stable_testnet())
-    #validators = ledger.query_validators()
-    # choose any validator
-    #validator = validators[2]
-    #ctx.logger.info({validator.address})
-    
-    
-    if (converted_balance >1):
-        # delegate some tokens to this validator
-        agent_balance = agent_balance - UNCERTAINTYFET
-        #tx = ledger_client.delegate_tokens(validator.address, agent_balance, farmer.wallet)
-        #tx.wait_to_complete()
+#@farmer.on_interval(36000)
+async def get_faucet_farmer():#ctx: Context
+    while True:
+        ledger: LedgerClient = get_ledger()#"mainnet"
+        faucet: FaucetApi = get_faucet()
+        #fund_agent_if_low(farmer.wallet.address())
+        faucet.get_wealth(farmer.wallet.address())
+        agent_balance = ledger.query_bank_balance(Address(farmer.wallet.address()))
+        converted_balance = agent_balance/ONETESTFET
         
-        #then call function to stake
-        #ctx.logger.info("Delegation completed.")
-        summary = ledger.query_staking_summary(farmer.wallet.address())
-        totalstaked = summary.total_staked/ONETESTFET
-        ctx.logger.info(f"Staked: {totalstaked} TESTFET")
+        logging.info(f"Received: {converted_balance} TESTFET")
+        #ctx.logger.info(f"Received: {converted_balance} TESTFET")
+    
+        #ctx.logger.info({agent_balance})
+        
+        #staking letsgooo
+        #ledger_client = LedgerClient(NetworkConfig.fetchai_stable_testnet())
+        #faucet_api = FaucetApi(NetworkConfig.fetchai_stable_testnet())
+        #validators = ledger.query_validators()
+        # choose any validator
+        #validator = validators[2]
+        #ctx.logger.info({validator.address})
+        
+        
+        if (converted_balance >1):
+            # delegate some tokens to this validator
+            agent_balance = agent_balance - UNCERTAINTYFET
+            #tx = ledger_client.delegate_tokens(validator.address, agent_balance, farmer.wallet)
+            #tx.wait_to_complete()
+            
+            #then call function to stake
+            #ctx.logger.info("Delegation completed.")
+            summary = ledger.query_staking_summary(farmer.wallet.address())
+            totalstaked = summary.total_staked/ONETESTFET
+            #ctx.logger.info(f"Staked: {totalstaked} TESTFET")
+            logging.info(f"Staked: {totalstaked} TESTFET")
+        
+        print("Doing hard work...")
+        await asyncio.sleep(5)
 
 
  
@@ -142,4 +148,11 @@ async def request_funds(ctx: Context, sender: str, msg: TopupRequest):
 
 
 if __name__ == "__main__":
-    farmer.run()
+    #farmer.run()
+    print("Starting the external loop from the agent or bureau...")
+
+    loop.create_task(get_faucet_farmer())
+    # > when attaching the agent to the external loop
+    loop.create_task(farmer.run_async())
+    with contextlib.suppress(KeyboardInterrupt):
+        loop.run_forever()
