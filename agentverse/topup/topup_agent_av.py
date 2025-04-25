@@ -1,6 +1,4 @@
 #agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7 agentverse
-#agent1qgdm8dzunh35h5wpa6c06rx5zuuztta2nyl8cnm8ncpr4l6hva9x6ewg8rm localhost
-
 from logging import Logger
 import logging
 import random
@@ -10,8 +8,8 @@ from dotenv import load_dotenv
 
 import argparse
 import time
-import asyncio
-import contextlib
+#import asyncio
+#import contextlib
 
 from uagents import Agent, Context, Protocol, Model, Field
 from uagents.config import TESTNET_REGISTRATION_FEE
@@ -26,7 +24,7 @@ from cosmpy.crypto.address import Address
 from cosmpy.aerial.config import NetworkConfig
 from cosmpy.aerial.wallet import LocalWallet
 
-loop = asyncio.get_event_loop()
+#loop = asyncio.get_event_loop()
 
 class TopupRequest(Model):
     amount: float
@@ -36,15 +34,11 @@ class TopupRequest(Model):
 class TopupResponse(Model):
     status: str
  
- 
+
 #load_dotenv()
-TOPUP_SEED = "" #ADD SEED HERE
 #AUTOAGENT_SEED = "this is just test listen up this is test"
 
-farmer = Agent(
-    name="Fetchfund - Top-up agent",
-    seed=TOPUP_SEED
-)
+farmer = Agent()
 
 ONETESTFET=1000000000000000000
 UNCERTAINTYFET=1000000000000000
@@ -55,6 +49,7 @@ fund_agent_if_low(farmer.wallet.address())
 async def introduce_agent(ctx: Context):
     ctx.logger.info(farmer.address)
     ctx.logger.info(farmer.wallet.address())
+    
     #agent1 = Agent(
     #name="Autovar - Test agent",
     #seed=AUTOAGENT_SEED
@@ -65,10 +60,17 @@ async def introduce_agent(ctx: Context):
     #    ctx.logger.info(f"Hello, I'm agent {ctx.agent.name} and I am starting up")
 
 
-#need to add some pause before starting
-#@farmer.on_interval(36000)
-async def get_faucet_farmer():#ctx: Context
-    while True:
+#@farmer.on_interval(12000)
+#async def stakeupdate(ctx: Context):#ctx: Context
+#        ledger: LedgerClient = get_ledger()#"mainnet"
+#        agent_balance = ledger.query_bank_balance(Address(farmer.wallet.address()))
+#        converted_balance = agent_balance/ONETESTFET
+#        ctx.logger.info(f"Received: {converted_balance} TESTFET")
+
+
+@farmer.on_interval(12000)
+async def get_faucet_farmer(ctx: Context):#ctx: Context
+    #while True:
         ledger: LedgerClient = get_ledger()#"mainnet"
         faucet: FaucetApi = get_faucet()
         #fund_agent_if_low(farmer.wallet.address())
@@ -76,7 +78,9 @@ async def get_faucet_farmer():#ctx: Context
         agent_balance = ledger.query_bank_balance(Address(farmer.wallet.address()))
         converted_balance = agent_balance/ONETESTFET
         
-        logging.info(f"Received: {converted_balance} TESTFET")
+        #logging.info(f"Received: {converted_balance} TESTFET")
+        farmer._logger.info(f"Received: {converted_balance} TESTFET")
+
         #ctx.logger.info(f"Received: {converted_balance} TESTFET")
     
         #ctx.logger.info({agent_balance})
@@ -101,10 +105,11 @@ async def get_faucet_farmer():#ctx: Context
             summary = ledger.query_staking_summary(farmer.wallet.address())
             totalstaked = summary.total_staked/ONETESTFET
             #ctx.logger.info(f"Staked: {totalstaked} TESTFET")
-            logging.info(f"Staked: {totalstaked} TESTFET")
-        
-        print("Doing hard work...")
-        await asyncio.sleep(5)
+            #logging.info(f"Staked: {totalstaked} TESTFET")
+            farmer._logger.info(f"Staked: {totalstaked} TESTFET")
+
+        #print("Doing hard work...")
+        #await asyncio.sleep(10)#36000
 
 
  
@@ -136,7 +141,7 @@ async def request_funds(ctx: Context, sender: str, msg: TopupRequest):
     ctx.logger.info(f"📩 After funds received: {sender_balance}")
 
     #ctx.logger.info({sender_balance})
-    await asyncio.sleep(5)
+    #await asyncio.sleep(5)
     
     try:
         await ctx.send(sender, TopupResponse(status="Success!"))
@@ -147,11 +152,12 @@ async def request_funds(ctx: Context, sender: str, msg: TopupRequest):
 
 
 if __name__ == "__main__":
-    #farmer.run()
+    farmer.run()
     print("Starting the external loop from the agent or bureau...")
+    farmer._logger.info("Starting agent..")
 
-    loop.create_task(get_faucet_farmer())
+    #loop.create_task(get_faucet_farmer())
     # > when attaching the agent to the external loop
-    loop.create_task(farmer.run_async())
-    with contextlib.suppress(KeyboardInterrupt):
-        loop.run_forever()
+    #loop.create_task(farmer.run_async())
+    #with contextlib.suppress(KeyboardInterrupt):
+    #    loop.run_forever()
