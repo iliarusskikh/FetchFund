@@ -98,7 +98,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         elif isinstance(item, TextContent):
             ctx.logger.info(f"Got a message from {sender}: {item.text}")
             ctx.storage.set(str(ctx.session), sender)
-            prompt = f'''Analyse the data which contains heart beat as "value" and its timestamp within past 2 hours. Evaluate if any value is greater than 100, then return "stop" if true. Otherwise, return "continue". Again, only return one word "stop" or "continue". This is the data provided: {item.text}'''
+            prompt = f'''Analyse the data which contains heart beat as "value" and its timestamp within past 2 hours. Evaluate if any value is greater than 100, then return "stop" if true. Otherwise, return "continue". Again, only return one word "stop" or "continue". This is the data provided: {item.text}. If no data found in the query, insert <UNKNOWN> in the output schema. '''
             await ctx.send(
                 AI_AGENT_ADDRESS,
                 StructuredOutputPrompt(
@@ -138,8 +138,8 @@ async def handle_structured_output_response(
 
     try:
         # Parse the structured output to get the address
-       heartbeat_request = Heartbeat.parse_obj(msg.output)
-       hb = heartbeat_request.status
+       heartbeat_response = HeartbeatResponse.parse_obj(msg.output)
+       hb = heartbeat_response.status
         
        if not hb:
            await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid heartbeat data in your query."),)

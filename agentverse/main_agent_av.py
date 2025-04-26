@@ -56,13 +56,13 @@ sys.excepthook = handle_unexpected_exception
 # Agentverse agent addresses - Updated to match actual running agents
 HEARTBEAT_AGENT="agent1q20850rnurygmuuu5v3ryzhxl2mrfnwler8gzc0h4u4xp4xxuruljj54rwp"
 TOPUP_AGENT="agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7"
+REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
 
 COIN_AGENT="agent1qw6cxgq4l8hmnjctm43q97vajrytuwjc2e2n4ncdfpqk6ggxcfmxuwdc9rq"
 FGI_AGENT="agent1qgzh245lxeaapd32mxlwgdf2607fkt075hymp06rceknjnc2ylznwdv8up7"
 REASON_AGENT="agent1qwlg48h8sstknk7enc2q44227ahq6dr5mjg0p7z62ca6tfueze38kyrtyl2"
 CRYPTONEWS_AGENT="agent1q2cq0q3cnhccudx6cym8smvpquafsd99lrwexppuecfrnv90xlrs5lsxw6k"
 SWAPLAND_AGENT="agent1qdcpchwle7a5l5q5le0xkswnx4p78jflsnw7tpchjz0dsr2yswepqdvk7at"#
-REWARD_AGENT="agent1qde8udnttat2mmq3srkrz60wm3248yg43528wy2guwyewtesd73z7x3swru"
 
 
 ### AGENTVERSE INTERACTION CLASSES ###
@@ -77,8 +77,6 @@ class HeartbeatResponse(Model):
     status: str = Field(
         description="stop or continue",
     )
-
-
 
 ### ___ AGENT ###
 class CoinRequest(Model):
@@ -134,11 +132,9 @@ class PaymentReceived(Model):
     status: str
     
 class RewardRequest(Model):
-    status: str
-    
-class SwapCompleted(Model):
-    status: str
-    message: str
+    status: str = Field(
+        description="user requesting reward",
+    )
     
 ### TOP-UP AGENT ###
 class TopupRequest(Model):
@@ -158,6 +154,11 @@ class SwaplandRequest(Model):
 
 class SwaplandResponse(Model):
     status: str
+    
+### SWAP AGENT ###
+class SwapCompleted(Model):
+    status: str
+    message: str
 ###--------------###
 
 
