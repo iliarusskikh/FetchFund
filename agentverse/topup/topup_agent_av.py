@@ -1,10 +1,13 @@
-#agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7 agentverse
+#agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7
 from logging import Logger
 import logging
 import random
 import sys
 import os
 from dotenv import load_dotenv
+
+from datetime import datetime
+from uuid import uuid4
 
 import argparse
 import time
@@ -24,7 +27,25 @@ from cosmpy.crypto.address import Address
 from cosmpy.aerial.config import NetworkConfig
 from cosmpy.aerial.wallet import LocalWallet
 
+# Import the necessary components of the chat protocol
+from uagents_core.contrib.protocols.chat import (
+    ChatAcknowledgement,
+    ChatMessage,
+    EndSessionContent,
+    StartSessionContent,
+    TextContent,
+    chat_protocol_spec,
+)
+
 #loop = asyncio.get_event_loop()
+
+class StructuredOutputPrompt(Model):
+    prompt: str
+    output_schema: dict[str, Any]
+
+class StructuredOutputResponse(Model):
+    output: dict[str, Any]
+
 
 class TopupRequest(Model):
     amount: float
@@ -34,14 +55,40 @@ class TopupRequest(Model):
 class TopupResponse(Model):
     status: str
  
+class TopupResponseChat(Model):
+    response: str = Field(
+        description="Response from ASI1 LLM",
+    )
 
 #load_dotenv()
 #AUTOAGENT_SEED = "this is just test listen up this is test"
+
+# AI Agent Address for structured output processing
+AI_AGENT_ADDRESS = 'agent1q2gmk0r2vwk6lcr0pvxp8glvtrdzdej890cuxgegrrg86ue9cahk5nfaf3c'
+if not AI_AGENT_ADDRESS:
+    raise ValueError("AI_AGENT_ADDRESS not set")
 
 farmer = Agent()
 
 ONETESTFET=1000000000000000000
 UNCERTAINTYFET=1000000000000000
+
+
+def create_text_chat(text: str, end_session: bool = True) -> ChatMessage:
+    content = [TextContent(type="text", text=text)]
+    if end_session:
+        content.append(EndSessionContent(type="end-session"))
+    return ChatMessage(
+        timestamp=datetime.utcnow(),
+        msg_id=uuid4(),
+        content=content,
+    )
+# Initialize the chat protocol
+chat_proto = Protocol(spec=chat_protocol_spec)
+struct_output_client_proto = Protocol(
+    name="StructuredOutputClientProtocol", version="0.1.0"
+)
+
 
 fund_agent_if_low(farmer.wallet.address())
  
@@ -60,12 +107,91 @@ async def introduce_agent(ctx: Context):
     #    ctx.logger.info(f"Hello, I'm agent {ctx.agent.name} and I am starting up")
 
 
-#@farmer.on_interval(12000)
-#async def stakeupdate(ctx: Context):#ctx: Context
-#        ledger: LedgerClient = get_ledger()#"mainnet"
-#        agent_balance = ledger.query_bank_balance(Address(farmer.wallet.address()))
-#        converted_balance = agent_balance/ONETESTFET
-#        ctx.logger.info(f"Received: {converted_balance} TESTFET")
+
+
+# Message Handler - Process received messages and send acknowledgements
+@chat_proto.on_message(ChatMessage)
+async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
+    ctx.logger.info(f"Got a message from {sender}: {msg}")
+    ctx.storage.set(str(ctx.session), sender)
+    await ctx.send(
+        sender,
+        ChatAcknowledgement(timestamp=datetime.utcnow(), acknowledged_msg_id=msg.msg_id),
+    )
+
+    for item in msg.content:
+        if isinstance(item, StartSessionContent):
+            ctx.logger.info(f"Got a start session message from {sender}")
+            continue
+        elif isinstance(item, TextContent):
+            ctx.logger.info(f"Got a message from {sender}: {item.text}")
+            ctx.storage.set(str(ctx.session), sender)
+            prompt = f'''Message received from user: {item.text}. Greet the user. You are a top-up agent, part of FetchFund system. Mention that user needs to use TopupRequest Model to interact with this agent: class TopupRequest(Model) - amount: float, agentwallet: str, fetwallet: str.'''
+            await ctx.send(
+                AI_AGENT_ADDRESS,
+                StructuredOutputPrompt(
+                    prompt=prompt, output_schema=TopupResponseChat.schema()
+                ),)
+        else:
+            ctx.logger.info(f"Got unexpected content from {sender}")
+
+
+# Acknowledgement Handler - Process received acknowledgements
+@chat_proto.on_message(ChatAcknowledgement)
+async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
+    ctx.logger.info(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
+
+
+
+@struct_output_client_proto.on_message(StructuredOutputResponse)
+async def handle_structured_output_response(
+    ctx: Context, sender: str, msg: StructuredOutputResponse
+):
+    session_sender = ctx.storage.get(str(ctx.session))
+    if session_sender is None:
+        ctx.logger.error(
+            "Discarding message because no session sender found in storage"
+        )
+        return
+
+    if "<UNKNOWN>" in str(msg.output):
+        await ctx.send(
+            session_sender,
+            create_text_chat(
+                "Sorry, I couldn't process your request. Please include a valid prompt text."
+            ),
+        )
+        return
+
+    try:
+        # Parse the structured output to get the address
+       topup_request = TopupResponseChat.parse_obj(msg.output)
+       tp = topup_request.response
+        
+       if not tp:
+           await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid response for your query."),)
+           return
+
+       await ctx.send(session_sender, create_text_chat(str(tp)))
+
+        
+    except Exception as err:
+        ctx.logger.error(err)
+        await ctx.send(
+            session_sender,
+            create_text_chat(
+                "Sorry, I couldn't read your query. Please try again later."
+            ),
+        )
+        return
+
+
+# Include the protocol in the agent to enable the chat functionality
+# This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
+farmer.include(chat_proto, publish_manifest=True)
+farmer.include(struct_output_client_proto, publish_manifest=True)
+
+
 
 
 @farmer.on_interval(12000)
@@ -161,3 +287,5 @@ if __name__ == "__main__":
     #loop.create_task(farmer.run_async())
     #with contextlib.suppress(KeyboardInterrupt):
     #    loop.run_forever()
+
+    
