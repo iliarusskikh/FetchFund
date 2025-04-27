@@ -3,8 +3,9 @@
 import logging
 import sys
 import os
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 import atexit
+import time
 from uagents import Agent, Context, Model, Field
 from typing import Optional
 #from asi.llm_agent import query_llm
@@ -33,7 +34,8 @@ import json
 #ASI1_API_KEY = os.getenv("ASI1_API_KEY")
 #NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 #CMC_API_KEY = os.getenv("CMC_API_KEY")
-load_dotenv()
+#load_dotenv()
+
 METAMASK_PRIVATE_KEY = os.getenv("METAMASK_PRIVATE_KEY")
 AGENTVERSE_API_KEY = os.getenv("AGENTVERSE_API_KEY")
 
@@ -57,12 +59,12 @@ sys.excepthook = handle_unexpected_exception
 HEARTBEAT_AGENT="agent1q20850rnurygmuuu5v3ryzhxl2mrfnwler8gzc0h4u4xp4xxuruljj54rwp"
 TOPUP_AGENT="agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7"
 REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
+COIN_AGENT="agent1qthmuhfu5xlu4s8uwlq7z2ghxhpdqpj2r8smaushxu0qr3k3zcwuxu87t0t"
 
-COIN_AGENT="agent1qw6cxgq4l8hmnjctm43q97vajrytuwjc2e2n4ncdfpqk6ggxcfmxuwdc9rq"
 FGI_AGENT="agent1qgzh245lxeaapd32mxlwgdf2607fkt075hymp06rceknjnc2ylznwdv8up7"
 REASON_AGENT="agent1qwlg48h8sstknk7enc2q44227ahq6dr5mjg0p7z62ca6tfueze38kyrtyl2"
 CRYPTONEWS_AGENT="agent1q2cq0q3cnhccudx6cym8smvpquafsd99lrwexppuecfrnv90xlrs5lsxw6k"
-SWAPLAND_AGENT="agent1qdcpchwle7a5l5q5le0xkswnx4p78jflsnw7tpchjz0dsr2yswepqdvk7at"#
+SWAPLAND_AGENT="agent1qdcpchwle7a5l5q5le0xkswnx4p78jflsnw7tpchjz0dsr2yswepqdvk7at"
 
 
 ### AGENTVERSE INTERACTION CLASSES ###
@@ -78,9 +80,21 @@ class HeartbeatResponse(Model):
         description="stop or continue",
     )
 
+### COININFO AGENT ###
+class BlockchainRequest(Model):
+    blockchain: str = Field(
+        description="Blockchain or crypto network name to check the price of its native coin",
+    )
+
+class CoinResponse(Model):
+    name: str
+    symbol: str
+    current_price: float
+    market_cap: float
+    total_volume: float
+    price_change_24h: float
+
 ### ___ AGENT ###
-class CoinRequest(Model):
-    blockchain: str
 
 class CryptonewsRequest(Model):
     limit: Optional[int] = 1
@@ -94,13 +108,6 @@ class ASI1Request(Model):
 class ASI1Response(Model):
     decision: str
 
-class CoinResponse(Model):
-    name: str
-    symbol: str
-    current_price: float
-    market_cap: float
-    total_volume: float
-    price_change_24h: float
 
 class FGIRequest(Model):
     limit: Optional[int] = 1
@@ -304,7 +311,9 @@ async def handle_trading_request(ctx: Context, sender: str, msg: TradingRequest)
 @agent.on_interval(period=24 * 60 * 60.0)  # Runs every 24 hours
 async def swapland_request(ctx: Context):
     """Confirm that the user is calm and not overexcited"""
-    await asyncio.sleep(15)
+    
+    #await asyncio.sleep(15)
+    time.sleep(30)
     #need to check the heartbeat data
     try:
         data12 = [
@@ -422,7 +431,7 @@ async def message_handler(ctx: Context, sender: str, msg: PaymentReceived):
             
             await asyncio.sleep(5)
             
-            await ctx.send(COIN_AGENT, CoinRequest(blockchain=NETWORK))
+            await ctx.send(COIN_AGENT, BlockchainRequest(blockchain=NETWORK))
             print(f"Sent request") #stuck here
 
         except Exception as e:
@@ -657,5 +666,4 @@ async def confirm_transaction(ctx: Context, sender: str, msg: TransactionInfo):
 
 # Ensure the agent starts running
 if __name__ == "__main__":
-    load_dotenv()       # Load environment variables
     agent.run()
