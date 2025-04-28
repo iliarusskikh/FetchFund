@@ -202,7 +202,7 @@ async def handle_structured_output_response(
        response_text= str(get_crypto_info(str(block)))
 
        await ctx.send(session_sender, create_text_chat(response_text))
-
+       
     except Exception as err:
         ctx.logger.error(err)
         await ctx.send(
@@ -221,6 +221,7 @@ async def process_response(ctx: Context, msg: BlockchainRequest) -> CoinResponse
 
     crypto_data = get_crypto_info(msg.blockchain)
     agent2._logger.info(f"📊 Crypto Info: {crypto_data}")
+    return crypto_data
 
 
 @agent2.on_message(model=BlockchainRequest)
@@ -232,6 +233,7 @@ async def handle_message(ctx: Context, sender: str, msg: BlockchainRequest):
 
     await ctx.send(sender, response)
 
+    return response
 
 
 
