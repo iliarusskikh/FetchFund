@@ -2,6 +2,7 @@
 from datetime import datetime
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model
+from uagents.experimental.quota import QuotaProtocol, RateLimit
 
 import os
 import logging
@@ -41,6 +42,13 @@ def create_text_chat(text: str, end_session: bool = True) -> ChatMessage:
 chat_proto = Protocol(spec=chat_protocol_spec)
 struct_output_client_proto = Protocol(
     name="StructuredOutputClientProtocol", version="0.1.0"
+)
+
+proto = QuotaProtocol(
+    storage_reference=agent2.storage,
+    name="FethcFund-CoinInfo-Protocol",
+    version="0.1.0",
+    default_rate_limit=RateLimit(window_size_minutes=60, max_requests=10),
 )
 
 
@@ -198,11 +206,11 @@ async def handle_structured_output_response(
        if not block:
            await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid blockchain name in your query."),)
            return
-
+        
        response_text= str(get_crypto_info(str(block)))
 
        await ctx.send(session_sender, create_text_chat(response_text))
-       
+
     except Exception as err:
         ctx.logger.error(err)
         await ctx.send(
@@ -224,13 +232,12 @@ async def process_response(ctx: Context, msg: BlockchainRequest) -> CoinResponse
     return crypto_data
 
 
-@agent2.on_message(model=BlockchainRequest)
+@proto.on_message(model=BlockchainRequest)
 async def handle_message(ctx: Context, sender: str, msg: BlockchainRequest):
     """Handle incoming messages requesting crypto information"""
     agent2._logger.info(f"📩 Received message from {sender}: {msg.blockchain}")
     
     response = await process_response(ctx, msg)
-
     await ctx.send(sender, response)
 
     return response
@@ -240,6 +247,7 @@ async def handle_message(ctx: Context, sender: str, msg: BlockchainRequest):
 # Include the protocol in the agent to enable the chat functionality
 # This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
 agent2.include(chat_proto, publish_manifest=True)
+agent2.include(proto, publish_manifest=True)
 agent2.include(struct_output_client_proto, publish_manifest=True)
 
 if __name__ == '__main__':
