@@ -60,10 +60,10 @@ HEARTBEAT_AGENT="agent1q20850rnurygmuuu5v3ryzhxl2mrfnwler8gzc0h4u4xp4xxuruljj54r
 TOPUP_AGENT="agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7"
 REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
 COIN_AGENT="agent1qthmuhfu5xlu4s8uwlq7z2ghxhpdqpj2r8smaushxu0qr3k3zcwuxu87t0t"
+CRYPTONEWS_AGENT="agent1qgsgv6enxnd6hlqg038ufvnc3k0xpldtemq86l37ktwa5akteevc2k4jswz"
 
 FGI_AGENT="agent1qgzh245lxeaapd32mxlwgdf2607fkt075hymp06rceknjnc2ylznwdv8up7"
 REASON_AGENT="agent1qwlg48h8sstknk7enc2q44227ahq6dr5mjg0p7z62ca6tfueze38kyrtyl2"
-CRYPTONEWS_AGENT="agent1q2cq0q3cnhccudx6cym8smvpquafsd99lrwexppuecfrnv90xlrs5lsxw6k"
 SWAPLAND_AGENT="agent1qdcpchwle7a5l5q5le0xkswnx4p78jflsnw7tpchjz0dsr2yswepqdvk7at"
 
 
@@ -250,8 +250,9 @@ async def introduce_agent(ctx: Context):
 
 
 
-#create an agent which would send all required inputs via agent which uses mailbox
+#START OF FRONTEND INTEGRATION
 
+#create an agent which would send all required inputs via agent which uses mailbox
 #first launch command
 # Handler for incoming API agent requests
 @agent.on_message(model=TradingRequest)
@@ -303,12 +304,20 @@ async def handle_trading_request(ctx: Context, sender: str, msg: TradingRequest)
         "timestamp": msg.timestamp
     }
 
+#END OF FRONTEND INTEGRATION
 
 
 
 
 
-@agent.on_interval(period=24 * 60 * 60.0)  # Runs every 24 hours
+
+
+
+
+
+
+
+#@agent.on_interval(period=24 * 60 * 60.0)  # Runs every 24 hours
 async def swapland_request(ctx: Context):
     """Confirm that the user is calm and not overexcited"""
     
