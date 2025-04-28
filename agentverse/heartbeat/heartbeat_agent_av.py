@@ -10,6 +10,7 @@ from logging import Logger
 import sys
 import requests
 import atexit
+from uagents.experimental.quota import QuotaProtocol, RateLimit
 
 
 # Import the necessary components of the chat protocol
@@ -45,6 +46,12 @@ struct_output_client_proto = Protocol(
     name="StructuredOutputClientProtocol", version="0.1.0"
 )
 
+proto = QuotaProtocol(
+    storage_reference=agent2.storage,
+    name="FethcFund-Heartbeat-Protocol",
+    version="0.1.0",
+    default_rate_limit=RateLimit(window_size_minutes=60, max_requests=10),
+)
 
 class ContextPrompt(Model):
     context: str
@@ -159,13 +166,8 @@ async def handle_structured_output_response(
         return
 
 
-# Include the protocol in the agent to enable the chat functionality
-# This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
-agent2.include(chat_proto, publish_manifest=True)
-agent2.include(struct_output_client_proto, publish_manifest=True)
 
-
-@agent2.on_message(HeartbeatRequest, replies={ContextPrompt})
+@proto.on_message(HeartbeatRequest, replies={ContextPrompt})
 async def handle_request(ctx: Context, sender: str, msg: HeartbeatRequest):
     ctx.logger.info(f"Heartbeat data received: {msg.hbdata}")
 
@@ -189,7 +191,11 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
         agent._logger.info(f"Error sending data to agent: {e}")
 
 
-
+# Include the protocol in the agent to enable the chat functionality
+# This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
+agent2.include(chat_proto, publish_manifest=True)
+agent2.include(struct_output_client_proto, publish_manifest=True)
+agent2.include(proto, publish_manifest=True)
 
 if __name__ == '__main__':
     agent2.run()

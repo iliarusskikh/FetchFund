@@ -4,34 +4,30 @@
 #this agent receives request to get the reward. upon request it checks storage fet, and send the , confirms with given agent address and sends the reward. test tokens for now
 #requests fees as 6 TESTFET
 #rewards main agent with 2 TESTFET
-
+import argparse
+import time
+import os
 import logging
 from logging import Logger
-
+import sys
 from datetime import datetime
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model
-
 from uagents.network import wait_for_tx_to_complete
 from uagents.setup import fund_agent_if_low
 
 from cosmpy.aerial.client import LedgerClient
 from cosmpy.aerial.faucet import FaucetApi
 from cosmpy.crypto.address import Address
- 
-from uagents.network import get_faucet, get_ledger
-from uagents.agent import AgentRepresentation #to use txn wallet
-
-
-import sys
-from uagents.config import TESTNET_REGISTRATION_FEE
-from uagents.utils import get_logger
-import argparse
-import time
 from cosmpy.aerial.config import NetworkConfig
 from cosmpy.aerial.wallet import LocalWallet
 
-import os
+from uagents.network import get_faucet, get_ledger
+from uagents.agent import AgentRepresentation #to use txn wallet
+from uagents.config import TESTNET_REGISTRATION_FEE
+from uagents.utils import get_logger
+from uagents.experimental.quota import QuotaProtocol, RateLimit
+
 
 # Import the necessary components of the chat protocol
 from uagents_core.contrib.protocols.chat import (
@@ -109,7 +105,12 @@ chat_proto = Protocol(spec=chat_protocol_spec)
 struct_output_client_proto = Protocol(
     name="StructuredOutputClientProtocol", version="0.1.0"
 )
-
+proto = QuotaProtocol(
+    storage_reference=reward.storage,
+    name="FethcFund-Reward-Protocol",
+    version="0.1.0",
+    default_rate_limit=RateLimit(window_size_minutes=60, max_requests=10),
+)
 
 class StructuredOutputPrompt(Model):
     prompt: str
@@ -192,17 +193,11 @@ async def handle_structured_output_response(
         return
 
 
-# Include the protocol in the agent to enable the chat functionality
-# This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
-reward.include(chat_proto, publish_manifest=True)
-reward.include(struct_output_client_proto, publish_manifest=True)
-
-
 
 
 
 #main agent inquires to proceed with fees payment
-@reward.on_message(model=PaymentInquiry)
+@proto.on_message(model=PaymentInquiry)
 async def send_payment(ctx: Context, sender: str, msg: PaymentInquiry):
     ctx.logger.info(f"Received payment request from {sender}: {msg}")
     if(msg.ready == "ready"):
@@ -297,6 +292,14 @@ def stakystake():
     reward._logger.info("Delegation completed.")
 
  
+
+# Include the protocol in the agent to enable the chat functionality
+# This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
+reward.include(chat_proto, publish_manifest=True)
+reward.include(struct_output_client_proto, publish_manifest=True)
+reward.include(proto, publish_manifest=True)
+
+
 
 if __name__ == "__main__":
     reward.run()

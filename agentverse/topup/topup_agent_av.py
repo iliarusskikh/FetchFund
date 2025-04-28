@@ -4,7 +4,6 @@ import logging
 import random
 import sys
 import os
-from dotenv import load_dotenv
 
 from datetime import datetime
 from uuid import uuid4
@@ -26,6 +25,8 @@ from cosmpy.aerial.faucet import FaucetApi
 from cosmpy.crypto.address import Address
 from cosmpy.aerial.config import NetworkConfig
 from cosmpy.aerial.wallet import LocalWallet
+
+from uagents.experimental.quota import QuotaProtocol, RateLimit
 
 # Import the necessary components of the chat protocol
 from uagents_core.contrib.protocols.chat import (
@@ -90,10 +91,17 @@ def create_text_chat(text: str, end_session: bool = True) -> ChatMessage:
         msg_id=uuid4(),
         content=content,
     )
+
 # Initialize the chat protocol
 chat_proto = Protocol(spec=chat_protocol_spec)
 struct_output_client_proto = Protocol(
     name="StructuredOutputClientProtocol", version="0.1.0"
+)
+proto = QuotaProtocol(
+    storage_reference=farmer.storage,
+    name="FethcFund-Topup-Protocol",
+    version="0.1.0",
+    default_rate_limit=RateLimit(window_size_minutes=60, max_requests=10),
 )
 
 
@@ -207,14 +215,6 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         return
 
 
-# Include the protocol in the agent to enable the chat functionality
-# This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
-farmer.include(chat_proto, publish_manifest=True)
-farmer.include(struct_output_client_proto, publish_manifest=True)
-
-
-
-
 @farmer.on_interval(12000)
 async def get_faucet_farmer(ctx: Context):#ctx: Context
     #while True:
@@ -258,7 +258,7 @@ async def get_faucet_farmer(ctx: Context):#ctx: Context
  
  
 #idealy should be sending funds from the FET wallet, on mainnet. but lets farm for now
-@farmer.on_message(model=TopupRequest)
+@proto.on_message(model=TopupRequest)
 async def request_funds(ctx: Context, sender: str, msg: TopupRequest):
     """Handles topup requests Topup."""
         
@@ -318,13 +318,18 @@ async def chat_request_funds(ctx: Context, sender: str, msg: TopupRequest):
     sender_balance = sender_balance + amo/ONETESTFET
     ctx.logger.info(f"📩 After funds received: {sender_balance}")
 
-    
+
+# Include the protocol in the agent to enable the chat functionality
+# This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
+farmer.include(chat_proto, publish_manifest=True)
+farmer.include(struct_output_client_proto, publish_manifest=True)
+farmer.include(proto, publish_manifest=True)
 
 
 
 if __name__ == "__main__":
     farmer.run()
-    print("Starting the external loop from the agent or bureau...")
+    #print("Starting the external loop from the agent or bureau...")
     farmer._logger.info("Starting agent..")
 
     #loop.create_task(get_faucet_farmer())
