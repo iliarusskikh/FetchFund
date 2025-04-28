@@ -48,19 +48,26 @@ class StructuredOutputResponse(Model):
 
 
 class TopupRequest(Model):
-    amount: float
-    agentwallet: str
-    fetwallet: str
+    amount: float = Field(
+        description="Amount fo test fet to top up agent wallet address",
+    )
+    agentwallet: str = Field(
+        description="agent wallet address",
+    )
+    fetwallet: str = Field(
+        description="ASI FET wallet address",
+    )
 
 class TopupResponse(Model):
-    status: str
+    status: str = Field(
+        description="success completion status",
+    )
  
 class TopupResponseChat(Model):
     response: str = Field(
         description="Response from ASI1 LLM",
     )
 
-#load_dotenv()
 #AUTOAGENT_SEED = "this is just test listen up this is test"
 
 # AI Agent Address for structured output processing
@@ -126,11 +133,13 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         elif isinstance(item, TextContent):
             ctx.logger.info(f"Got a message from {sender}: {item.text}")
             ctx.storage.set(str(ctx.session), sender)
-            prompt = f'''Message received from user: {item.text}. Greet the user. You are a top-up agent, part of FetchFund system. Mention that user needs to use TopupRequest Model to interact with this agent: class TopupRequest(Model) - amount: float, agentwallet: str, fetwallet: str.'''
+            #prompt = f'''Message received from user: {item.text}. Greet the user. You are a top-up agent, part of FetchFund system. User cannot interact with this agent via Chat Protocol. They need to implement class TopupRequest(Model) and class TopupResponse(Model) for their agent.'''
+            prompt =f'''{item.text}.'''
             await ctx.send(
                 AI_AGENT_ADDRESS,
                 StructuredOutputPrompt(
-                    prompt=prompt, output_schema=TopupResponseChat.schema()
+                    #prompt=prompt, output_schema=TopupResponseChat.schema()
+                    prompt=prompt, output_schema=TopupRequest.schema()
                 ),)
         else:
             ctx.logger.info(f"Got unexpected content from {sender}")
@@ -144,9 +153,7 @@ async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledge
 
 
 @struct_output_client_proto.on_message(StructuredOutputResponse)
-async def handle_structured_output_response(
-    ctx: Context, sender: str, msg: StructuredOutputResponse
-):
+async def handle_structured_output_response(ctx: Context, sender: str, msg: StructuredOutputResponse):
     session_sender = ctx.storage.get(str(ctx.session))
     if session_sender is None:
         ctx.logger.error(
@@ -158,22 +165,36 @@ async def handle_structured_output_response(
         await ctx.send(
             session_sender,
             create_text_chat(
-                "Sorry, I couldn't process your request. Please include a valid prompt text."
+                "Sorry, I couldn't process your request. Please include a valid prompt text to match TopupRequest(Model)."
             ),
         )
         return
 
     try:
-        # Parse the structured output to get the address
-       topup_request = TopupResponseChat.parse_obj(msg.output)
-       tp = topup_request.response
-        
-       if not tp:
-           await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid response for your query."),)
-           return
+       # Parse the structured output to get the address
+       #topup_request = TopupResponseChat.parse_obj(msg.output)
+       #tp = topup_request.response
+       topup_request = TopupRequest.parse_obj(msg.output)
+       am = topup_request.amount
+       ag = topup_request.agentwallet
+       fe = topup_request.fetwallet
+       
+       addition=""
 
-       await ctx.send(session_sender, create_text_chat(str(tp)))
+       if am >15:
+        topup_request.amount = 15
+        addition = "The maximum amount per transaction is 15 TESTFET! Please, do not overuse this service."
 
+       ctx.logger.info(f"Received formatted request: {topup_request}")
+
+       if not all([am, ag, fe]):
+            await ctx.send(session_sender, create_text_chat("Sorry, I couldn't find a valid response for your query that would have matched TopupRequest(Model)."))
+            return
+
+       await chat_request_funds(ctx, sender, topup_request)
+
+       endoftransaction ="You agent wallet has been topped up! "+addition+" Thank you for using this service :)"
+       await ctx.send(session_sender, create_text_chat(str(endoftransaction)))
         
     except Exception as err:
         ctx.logger.error(err)
@@ -207,9 +228,6 @@ async def get_faucet_farmer(ctx: Context):#ctx: Context
         #logging.info(f"Received: {converted_balance} TESTFET")
         farmer._logger.info(f"Received: {converted_balance} TESTFET")
 
-        #ctx.logger.info(f"Received: {converted_balance} TESTFET")
-    
-        #ctx.logger.info({agent_balance})
         
         #staking letsgooo
         #ledger_client = LedgerClient(NetworkConfig.fetchai_stable_testnet())
@@ -230,8 +248,7 @@ async def get_faucet_farmer(ctx: Context):#ctx: Context
             #ctx.logger.info("Delegation completed.")
             summary = ledger.query_staking_summary(farmer.wallet.address())
             totalstaked = summary.total_staked/ONETESTFET
-            #ctx.logger.info(f"Staked: {totalstaked} TESTFET")
-            #logging.info(f"Staked: {totalstaked} TESTFET")
+
             farmer._logger.info(f"Staked: {totalstaked} TESTFET")
 
         #print("Doing hard work...")
@@ -251,7 +268,7 @@ async def request_funds(ctx: Context, sender: str, msg: TopupRequest):
     sender_balance = ledger.query_bank_balance(Address(msg.agentwallet))/ONETESTFET#ctx.agent.wallet.address()
     #fetwallet_balance = ledger.query_bank_balance(Address(msg.fetwallet))/ONETESTFET#ctx.agent.wallet.address()
     #ctx.logger.info({fetwallet_balance})
-    ctx.logger.info({sender_balance})
+    ctx.logger.info(f'''Sender balance is: {sender_balance}''')
 
     amo = int(msg.amount * ONETESTFET) #5 TESTFET
     deno = 'atestfet'
@@ -274,6 +291,34 @@ async def request_funds(ctx: Context, sender: str, msg: TopupRequest):
     except Exception as e:
         #logging.error(f" Error sending TopupResponse: {e}")
         ctx.logger.error(f" Error sending TopupResponse: {e}")
+
+
+
+#chat interaction function
+async def chat_request_funds(ctx: Context, sender: str, msg: TopupRequest):
+    """Handles topup requests Topup."""
+    ctx.logger.info(f"Inside the function: {msg}")
+    ledger: LedgerClient = get_ledger()
+
+    sender_balance = ledger.query_bank_balance(Address(msg.agentwallet))/ONETESTFET#ctx.agent.wallet.address()
+    #fetwallet_balance = ledger.query_bank_balance(Address(msg.fetwallet))/ONETESTFET#ctx.agent.wallet.address()
+    ctx.logger.info(f'''Sender balance is: {sender_balance}''')
+
+
+    amo = int(msg.amount * ONETESTFET) #5 TESTFET
+    deno = 'atestfet'
+    
+    try:
+        #transaction = ctx.ledger.send_tokens(msg.agentwallet, amo, deno,msg.fetwallet)
+        transaction = ctx.ledger.send_tokens(msg.agentwallet, amo, deno,farmer.wallet)
+    except Exception as e:
+        ctx.logger.error(f" Error sending tokens: {e}")
+
+    sender_balance = ledger.query_bank_balance(Address(msg.agentwallet))/ONETESTFET
+    sender_balance = sender_balance + amo/ONETESTFET
+    ctx.logger.info(f"📩 After funds received: {sender_balance}")
+
+    
 
 
 
