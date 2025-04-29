@@ -65,11 +65,24 @@ class StructuredOutputResponse(Model):
 
 # Initialize Agent
 agent2 = Agent(
-    name="CryptoNews agent",
+    name="FetchFund - CryptoNews agent",
     port=8005,
     seed=CRYPTONEWS_SEED,
     #endpoint=["http://127.0.0.1:8005/submit"],
     mailbox = True,
+    readme =
+    """
+    ![domain:innovation-lab](https://img.shields.io/badge/innovation--lab-3D8BD3)
+    ![domain:fetchfund](https://img.shields.io/badge/fetchfund-3D23DD)
+    ![tag:fetchfund](https://img.shields.io/badge/fetchfund-4648A3)
+    ![domain:research](https://img.shields.io/badge/research-3D23AD)
+    # Agent Description
+    Role: Gathers recent cryptocurrency news.
+    Workflow:
+    Awaits requests from the Main Agent.
+    Fetches news from the NewsAPI for the past 2 days.
+    Returns the news to the Main Agent.
+    """,
     )
 
 
