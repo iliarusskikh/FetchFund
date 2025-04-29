@@ -60,7 +60,7 @@ HEARTBEAT_AGENT="agent1q20850rnurygmuuu5v3ryzhxl2mrfnwler8gzc0h4u4xp4xxuruljj54r
 TOPUP_AGENT="agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7"
 REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
 COIN_AGENT="agent1qthmuhfu5xlu4s8uwlq7z2ghxhpdqpj2r8smaushxu0qr3k3zcwuxu87t0t"
-CRYPTONEWS_AGENT="agent1qgsgv6enxnd6hlqg038ufvnc3k0xpldtemq86l37ktwa5akteevc2k4jswz"
+CRYPTONEWS_AGENT=""
 
 FGI_AGENT="agent1qgzh245lxeaapd32mxlwgdf2607fkt075hymp06rceknjnc2ylznwdv8up7"
 REASON_AGENT="agent1qwlg48h8sstknk7enc2q44227ahq6dr5mjg0p7z62ca6tfueze38kyrtyl2"
@@ -100,7 +100,7 @@ class CryptonewsRequest(Model):
     limit: Optional[int] = 1
 
 class CryptonewsResponse(Model):
-    cryptoupdates: str
+    response: str
     
 class ASI1Request(Model):
     query: str
@@ -350,8 +350,8 @@ async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
         
         #execute topup_agent to receive funds
         #user input required
-        topupwallet = "yes"#input("Would you like to top up your agent wallet?[yes/no]: ").lower()
-        if (topupwallet == "yes"):
+        topupamount = 10
+        if (topupwallet > 0):#if 0 then top up not required
             #user input required
             topupamount = 10#input("How many FET to transfer over?: ").lower()#convert from string to float
             
@@ -404,6 +404,10 @@ async def message_handler(ctx: Context, sender: str, msg: PaymentRequest):
     #need to add userinput
     rewardtopay = "yes"#input(f"You are required to pay {fees} FET for this service. Proceed?[yes/no]: ").lower()
     
+    
+    #instead i need to check here if the user agent has enough funds. if not, then return error, and finish the execution!
+    
+    
     if (rewardtopay == "yes"):
         transaction = ctx.ledger.send_tokens(msg.wallet_address, msg.amount, msg.denom,agent.wallet)
     else:
@@ -419,7 +423,6 @@ async def message_handler(ctx: Context, sender: str, msg: PaymentReceived):
         ctx.logger.info(f"Fees transaction successful!")
         ledger: LedgerClient = get_ledger()
         agent_balance = ledger.query_bank_balance(Address(agent.wallet.address()))/ONETESTFET
-        #print(f"Balance after fees: {agent_balance} TESTFET")
         ctx.logger.info(f"Balance after fees: {agent_balance} TESTFET")
         
         
@@ -473,7 +476,7 @@ async def handle_cryptonews_response(ctx: Context, sender: str, msg: CryptonewsR
     logging.info(f"📩 Received CryptonewsResponse!")
     
     global CRYPTONEWSINFO
-    CRYPTONEWSINFO = msg
+    CRYPTONEWSINFO = msg.response
     
     logging.info(f"📩 Sending request to FGI!")
     try:
