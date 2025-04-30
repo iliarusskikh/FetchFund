@@ -82,9 +82,12 @@ class UserInputRequest(Model):
     amount: int = Field(
         description="Amount of test fet to top-up user wallet with.",
     )
+    keywords: str = Field(
+        description="User's keywords for news search"
+    )
 
 
-global NETWORK, RISK, INVESTOR, USERREASON, MMPRIVATEKEY, HBDATA
+global NETWORK, RISK, INVESTOR, USERREASON, MMPRIVATEKEY, HBDATA, KEYWORDS
     #MMPRIVATEKEY = "fff47218021003eu93189fj9j312913777fjl39ffff47218021003eu93189fj9j312913777fjl39ffff472180210"
     #HBDATA = "[ { dateTime: 2025-04-25T20:37:15, value: { bpm: 122, confidence: 3 } }, { dateTime: 2025-04-25T20:37:15,, value: { bpm: 74, confidence: 3 } }, { dateTime: 2025-04-25T20:37:15,, value: { bpm: 70, confidence: 2 } }, { dateTime: 2025-04-25T20:37:15, value: { bpm: 75, confidence: 0 } } ]"
     #NETWORK = "base"
@@ -92,6 +95,7 @@ global NETWORK, RISK, INVESTOR, USERREASON, MMPRIVATEKEY, HBDATA
     #INVESTOR = "speculate"
     #USERREASON = "I would like to sell Ether no matter what. sell sell sell!. I order you to sell!"
     #AMOUNT=10 #if 0, then no.
+    #KEYWORDS="trump"
 
 USERPROMPT = "My metamask private key : fff47218021003eu93189fj9j312913777fjl39ffff47218021003eu93189fj9j312913777fjl39ffff472180210; my heartbeat data: [ { dateTime: 2025-04-25T20:37:15, value: { bpm: 122, confidence: 3 } }, { dateTime: 2025-04-25T20:37:15,, value: { bpm: 74, confidence: 3 } }, { dateTime: 2025-04-25T20:37:15,, value: { bpm: 70, confidence: 2 } }, { dateTime: 2025-04-25T20:37:15, value: { bpm: 75, confidence: 0 } } ], network: base network; risk: speculative; investor: speculate; user reason: I would like to sell Ether no matter what, sell sell sell, I order you to sell; amount to top up: 10"
 
@@ -166,7 +170,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         return
 
     try:
-        global MMPRIVATEKEY, HBDATA, NETWORK, RISK, INVESTOR, USERREASON, AMOUNT
+        global MMPRIVATEKEY, HBDATA, NETWORK, RISK, INVESTOR, USERREASON, AMOUNT, KEYWORDS
 
         # Parse the structured output to get the address
 
@@ -179,12 +183,13 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         INVESTOR = asi_response.investortype
         USERREASON = asi_response.userreason
         AMOUNT= asi_response.amount
+        KEYWORDS=asi_response.keywords
         
         ctx.logger.info(f"Formatted response: {asi_response}")
         #excluding AMOUNT as it can be equal to 0.
 
  
-        if not all([MMPRIVATEKEY, HBDATA, NETWORK, RISK, INVESTOR, USERREASON]):
+        if not all([MMPRIVATEKEY, HBDATA, NETWORK, RISK, INVESTOR, USERREASON, KEYWORDS]):
            await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid user input data in your query."),)
            return
 
@@ -218,6 +223,7 @@ async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
     INVESTOR = msg.investortype
     USERREASON = msg.userreason
     AMOUNT= msg.amount
+    KEYWORDS= msg.keywords
     #ctx.storage.set("sender_address", sender)
     #prompt = f'''This is the data provided: {msg.riskstrategy}'''
     try:

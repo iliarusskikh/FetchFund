@@ -1,8 +1,8 @@
 #pip install newsapi-python
-#agent1qgsgv6enxnd6hlqg038ufvnc3k0xpldtemq86l37ktwa5akteevc2k4jswz
+#agent1qgy6eh453lucsvgg30fffd70umcq6fwt2wgx9ksyfxnw45wu4ravs26rvt6 mailbox
 from datetime import datetime
 from uuid import uuid4
-from uagents import Agent, Protocol, Context, Model
+from uagents import Agent, Protocol, Context, Model, Field
 from uagents.experimental.quota import QuotaProtocol, RateLimit
 
 import os
@@ -15,6 +15,7 @@ import json
 from typing import Optional
 from newsapi import NewsApiClient
 from datetime import datetime, timedelta
+from typing import Any
 
 # Import the necessary components of the chat protocol
 from uagents_core.contrib.protocols.chat import (
@@ -46,8 +47,14 @@ sys.excepthook = handle_unexpected_exception
 
 
 class CryptonewsRequest(Model):
-    limit: Optional[int] = 1 = Field(
-        description="Not relevant at the moment",
+    limit: Optional[int] = 1
+    keywords: str = Field(
+        description="keywords separated with OR word"
+    )
+    
+class ASIRequest(Model):
+    keywords: str = Field(
+        description="keywords separated with OR word"
     )
 
 class CryptonewsResponse(Model):
@@ -68,21 +75,7 @@ agent2 = Agent(
     name="FetchFund - CryptoNews agent",
     port=8005,
     seed=CRYPTONEWS_SEED,
-    #endpoint=["http://127.0.0.1:8005/submit"],
     mailbox = True,
-    readme =
-    """
-    ![domain:innovation-lab](https://img.shields.io/badge/innovation--lab-3D8BD3)
-    ![domain:fetchfund](https://img.shields.io/badge/fetchfund-3D23DD)
-    ![tag:fetchfund](https://img.shields.io/badge/fetchfund-4648A3)
-    ![domain:research](https://img.shields.io/badge/research-3D23AD)
-    # Agent Description
-    Role: Gathers recent cryptocurrency news.
-    Workflow:
-    Awaits requests from the Main Agent.
-    Fetches news from the NewsAPI for the past 2 days.
-    Returns the news to the Main Agent.
-    """,
     )
 
 
@@ -138,11 +131,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         elif isinstance(item, TextContent):
             ctx.logger.info(f"Got a message from {sender}: {item.text}")
             #ctx.storage.set(str(ctx.session), sender)
-            prompt = f"Try to identify up to 5 keywords from user input, and return in output schema splitting it with OR word. This is user input: {item.text}."
+            prompt = f"Try to identify keywords from user input, and return in output schema splitting it with OR word. This is user input: {item.text}."
             await ctx.send(
                 AI_AGENT_ADDRESS,
                 StructuredOutputPrompt(
-                    prompt=prompt, output_schema=CryptonewsResponse.schema()
+                    prompt=prompt, output_schema=ASIRequest.schema()
                 ),
             )
         else:
@@ -179,16 +172,16 @@ async def handle_structured_output_response(
 
     try:
         # Parse the structured output to get the address
-       cryptonews_request = CryptonewsResponse.parse_obj(msg.output)
-       cn = cryptonews_request.response
-        
-       if not cn:
-           await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid query for the cryptonews agent."),)
-           return
-        
-       response_text= str(get_crypto_news(str(cn)))
+        cryptonews_request = ASIRequest.parse_obj(msg.output)
+        cn = cryptonews_request.keywords
 
-       await ctx.send(session_sender, create_text_chat(response_text))
+        if not cn:
+            await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid query for the cryptonews agent. Please, enter keywords that you would like to query about."),)
+            return
+        #str(cn)
+        response_text= str(get_recent_crypto_news(cryptonews_request.keywords))#might need another function that would take user keywords
+
+        await ctx.send(session_sender, create_text_chat(response_text))
         
     except Exception as err:
         ctx.logger.error(err)
@@ -204,12 +197,12 @@ async def handle_structured_output_response(
 
 
 
-def get_recent_crypto_news(limit: int = 1) -> CryptonewsResponse:
+def get_recent_crypto_news(keywords : str,limit: int = 1) -> CryptonewsResponse:
     """Fetch crypto news data from NewsAPI"""
     
     today = datetime.today().strftime('%Y-%m-%d')# Get today's date
     yesterday = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')# Get yesterday's date by subtracting 1 day
-   
+
     crypto_news=""
     news_output=""
     extracted_data = []
@@ -217,7 +210,7 @@ def get_recent_crypto_news(limit: int = 1) -> CryptonewsResponse:
         newsapi = NewsApiClient(api_key=NEWS_API_KEY)#"NEWS_API_KEY"
         
         #already a dictionary
-        crypto_news = newsapi.get_everything(q="crypto OR cryptocurrency OR bitcoin OR ethereum OR recession OR FOMC OR crypto exchange OR bearish OR bullish",from_param=str(yesterday),to=str(today), sort_by = "relevancy", page_size=10, page=1, language="en")#recession, FOMC, crypto exchange, bearish, bullish, financial market
+        crypto_news = newsapi.get_everything(q=keywords,from_param=str(yesterday),to=str(today), sort_by = "relevancy", page_size=10, page=1, language="en")#recession, FOMC, crypto exchange, bearish, bullish, financial market
         
         logging.info(f"Found info: {crypto_news}")
         #we need to optimise the size, otherwise it may exceed ASI1 28000 tokens limit
@@ -246,11 +239,8 @@ async def handle_message(ctx: Context, sender: str, msg: CryptonewsRequest):
     """Handle incoming messages requesting crypto news data"""
     logging.info(f"📩 Received message from {sender}: CryptonewsRequest for {msg.limit} entries")
     
-    response = get_recent_crypto_news(msg.limit)
+    response = get_recent_crypto_news(msg.keywords,msg.limit)
     await ctx.send(sender, CryptonewsResponse(response=response))
-
-
-
 
 
 

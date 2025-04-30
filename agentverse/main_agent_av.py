@@ -98,6 +98,9 @@ class CoinResponse(Model):
 
 class CryptonewsRequest(Model):
     limit: Optional[int] = 1
+    keywords: str = Field(
+        description="user's keywords for news query"
+    )
 
 class CryptonewsResponse(Model):
     response: str
@@ -464,7 +467,7 @@ async def handle_coin_response(ctx: Context, sender: str, msg: CoinResponse):
     try:
         #temporary disabled cryptonews
         #await ctx.send(FGI_AGENT, FGIRequest()) #temporary call
-        await ctx.send(CRYPTONEWS_AGENT, CryptonewsRequest()) #need to sent the data from this coin, change within 24 hours!
+        await ctx.send(CRYPTONEWS_AGENT, CryptonewsRequest(keywords=KEYWORDS)) #need to sent the data from this coin, change within 24 hours!
     except Exception as e:
         logging.error(f"❌ Error sending CryptonewsRequest: {e}")
 
