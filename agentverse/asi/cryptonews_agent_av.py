@@ -76,6 +76,7 @@ agent2 = Agent(
     port=8005,
     seed=CRYPTONEWS_SEED,
     mailbox = True,
+    readme_path = "README_cryptonews.md",
     )
 
 
@@ -100,7 +101,7 @@ struct_output_client_proto = Protocol(
 )
 proto = QuotaProtocol(
     storage_reference=agent2.storage,
-    name="FethcFund-CryptoNews-Protocol",
+    name="FetchFund-CryptoNews-Protocol",
     version="0.1.0",
     default_rate_limit=RateLimit(window_size_minutes=60, max_requests=10),
 )
@@ -130,7 +131,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             continue
         elif isinstance(item, TextContent):
             ctx.logger.info(f"Got a message from {sender}: {item.text}")
-            #ctx.storage.set(str(ctx.session), sender)
+            ctx.storage.set(str(ctx.session), sender)
             prompt = f"Try to identify keywords from user input, and return in output schema splitting it with OR word. This is user input: {item.text}."
             await ctx.send(
                 AI_AGENT_ADDRESS,
