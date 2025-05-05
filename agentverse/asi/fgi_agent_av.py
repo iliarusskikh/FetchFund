@@ -1,3 +1,4 @@
+#agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh av
 #agent1qfyrgg8w5pln25a6hcu3a3rx534lhs32aryqr5gx08djdclakzuex98dwzn mailbox
 from datetime import datetime
 from uuid import uuid4
@@ -32,10 +33,10 @@ if not CMC_API_KEY:
     logging.error("❌ CMC_API_KEY is not set. Please set it in environment variables.")
     sys.exit(1)
 
-FGI_SEED = os.getenv("FGI_SEED")
-if not FGI_SEED:
-    logging.error("❌ FGI_SEED is not set. Please set it in environment variables.")
-    sys.exit(1)
+#FGI_SEED = os.getenv("FGI_SEED")
+#if not FGI_SEED:
+#    logging.error("❌ FGI_SEED is not set. Please set it in environment variables.")
+#    sys.exit(1)
 
 # Configure Logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -73,11 +74,11 @@ class ASIRequest(Model):
 
 # Initialize Agent
 agent2 = Agent(
-    name="FetchFund - Fear and Greed Index agent",
-    port=8006,
-    seed=FGI_SEED,
-    mailbox = True,
-    readme_path = "README_fgi.md"
+    #name="FetchFund - Fear and Greed Index agent",
+    #port=8006,
+    #seed=FGI_SEED,
+    #mailbox = True,
+    #readme_path = "README_fgi.md"
     )
 
 

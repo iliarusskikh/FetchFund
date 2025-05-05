@@ -60,10 +60,11 @@ HEARTBEAT_AGENT="agent1q20850rnurygmuuu5v3ryzhxl2mrfnwler8gzc0h4u4xp4xxuruljj54r
 TOPUP_AGENT="agent1q08e85r72ywlp833e3gyvlvyu8v7h7d98l97xue8wkcurzk282r77sumaj7"
 REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
 COIN_AGENT="agent1qthmuhfu5xlu4s8uwlq7z2ghxhpdqpj2r8smaushxu0qr3k3zcwuxu87t0t"
-CRYPTONEWS_AGENT=""
+CRYPTONEWS_AGENT="agent1qgy6eh453lucsvgg30fffd70umcq6fwt2wgx9ksyfxnw45wu4ravs26rvt6"
+FGI_AGENT="agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh"#"agent1qfyrgg8w5pln25a6hcu3a3rx534lhs32aryqr5gx08djdclakzuex98dwzn" mailbox
+REASON_AGENT="agent1q2gmk0r2vwk6lcr0pvxp8glvtrdzdej890cuxgegrrg86ue9cahk5nfaf3c" #ASI:One
 
-FGI_AGENT="agent1qgzh245lxeaapd32mxlwgdf2607fkt075hymp06rceknjnc2ylznwdv8up7"
-REASON_AGENT="agent1qwlg48h8sstknk7enc2q44227ahq6dr5mjg0p7z62ca6tfueze38kyrtyl2"
+
 SWAPLAND_AGENT="agent1qdcpchwle7a5l5q5le0xkswnx4p78jflsnw7tpchjz0dsr2yswepqdvk7at"
 
 
@@ -94,8 +95,7 @@ class CoinResponse(Model):
     total_volume: float
     price_change_24h: float
 
-### ___ AGENT ###
-
+### CRYPTONEWS AGENT ###
 class CryptonewsRequest(Model):
     limit: Optional[int] = 1
     keywords: str = Field(
@@ -104,14 +104,8 @@ class CryptonewsRequest(Model):
 
 class CryptonewsResponse(Model):
     response: str
-    
-class ASI1Request(Model):
-    query: str
-    
-class ASI1Response(Model):
-    decision: str
 
-
+### FGI AGENT ###
 class FGIRequest(Model):
     limit: Optional[int] = 1
 
@@ -124,6 +118,20 @@ class FGIResponse(Model):
     data: list[FearGreedData]
     status: str
     timestamp: str
+    
+### REASON AGENT ASI:ONE ###
+class ContextPrompt(Model):
+    context: str
+    text: str
+    
+class Response(Model):
+    text: str
+    
+class ASI1Request(Model):
+    query: str
+    
+class ASI1Response(Model):
+    decision: str
 
 
 ### REWARD AGENT ###
@@ -173,8 +181,16 @@ class SwapCompleted(Model):
 
 
 ### USER_INPUTS ###
-ASIWALLET_PRIVATEKEY = ""
-EVMWALLET_PRIVATEKEY = ""
+USERINPUT_ASIWALLET_PRIVATEKEY = ""
+USERINPUT_EVMWALLET_PRIVATEKEY = ""
+USERINPUT_HBDATA= ""
+USERINPUT_NETWORK= ""
+USERINPUT_RISKSTRATEGY= ""
+USERINPUT_INVESTORTYPE= ""
+USERINPUT_REASON= ""
+USERINPUT_AMOUNT_TOPUP= ""
+USERINPUT_NEWS_KEYWORDS= ""
+
 ###--------------###
 
 
@@ -203,7 +219,6 @@ LATEST_ANALYSIS = {
 
 # Initialize the agent
 agent = Agent()
-
 
 
 # Add a new model for API wrapper requests
