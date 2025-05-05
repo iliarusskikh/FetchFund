@@ -1,4 +1,4 @@
-#agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh mailbox
+#agent1qfyrgg8w5pln25a6hcu3a3rx534lhs32aryqr5gx08djdclakzuex98dwzn mailbox
 from datetime import datetime
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model, Field
@@ -12,7 +12,7 @@ import atexit
 from dotenv import load_dotenv
 import json
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 # Import the necessary components of the chat protocol
@@ -34,7 +34,7 @@ if not CMC_API_KEY:
 
 FGI_SEED = os.getenv("FGI_SEED")
 if not FGI_SEED:
-    logging.error("❌ CMC_API_KEY is not set. Please set it in environment variables.")
+    logging.error("❌ FGI_SEED is not set. Please set it in environment variables.")
     sys.exit(1)
 
 # Configure Logging
@@ -128,12 +128,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             ctx.logger.info(f"Got a start session message from {sender}")
             continue
         elif isinstance(item, TextContent):
-
+            session_sender = ctx.storage.get(str(ctx.session))
             ctx.logger.info(f"Got a message from {sender}: {item.text}")
             ctx.storage.set(str(ctx.session), sender)
             response_text = await process_response(ctx, FGIRequest())
-
-            await ctx.send(session_sender, create_text_chat(response_text))
+    
+            await ctx.send(session_sender, create_text_chat(str(response_text)))
 
         else:
             ctx.logger.info(f"Got unexpected content from {sender}")

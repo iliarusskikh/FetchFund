@@ -15,12 +15,11 @@ Returns it to the Main Agent.
 
 ### EXAMPLE 1: CHAT PROTOCOL USER INPUT:
 ```
-
+[Any]
 ```
 ### EXAMPLE 1: CHAT PROTOCOL OUTPUT:
 ```
-
-
+data=[FearGreedData(value=55.0, value_classification='Neutral', timestamp='1746144000')] status='success' timestamp='2025-05-03T19:25:08.437663+00:00'
 ```
 
 ### USER INPUT MODEL:
@@ -32,11 +31,12 @@ class FGIRequest(Model):
 ```
 ### OUTPUT MODEL:
 ```
+
 class FearGreedData(Model):
     value: float
     value_classification: str
     timestamp: str
-
+    
 class FGIResponse(Model):
     data: list[FearGreedData]
     status: str
