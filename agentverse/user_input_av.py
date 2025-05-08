@@ -293,8 +293,6 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         except Exception as e:
             ctx.logger.info(f"Error sending data to Heartbeat agent: {e}")
         
-
-
     except Exception as err:
         ctx.logger.error(err)
         await ctx.send(
@@ -306,11 +304,16 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         return
 
 
+#required to distinguish from running chat protocol and model request
+sndr=""
 
 #agentic interaction
 @proto.on_message(UserInputRequest)
 async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
     ctx.logger.info(f"User input data received: {msg}")
+
+    ctx.storage.set(str(sndr), sender)
+
     global USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_AMOUNT_TOPUP, USERINPUT_NEWS_KEYWORDS
 
     USERINPUT_ASIWALLET_PRIVATEKEY = msg.privatekey1
@@ -329,21 +332,22 @@ async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
         int(USERINPUT_AMOUNT_TOPUP)
         ctx.logger.info("Can be converted to integer")
     except ValueError:
-        print("Cannot be converted to integer")
+        ctx.logger.info("Cannot be converted to integer")
         USERINPUT_AMOUNT_TOPUP = 0
-
+    
     if not all([USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_NEWS_KEYWORDS]):
-        await ctx.send(sender,UserOutputResponse("Sorry, I couldn't find a valid user input data in your query."),)
+        await ctx.send(sender,UserOutputResponse(response="Sorry, I couldn't find a valid user input data in your query."),)
         return
 
-    await ctx.send(sender,UserOutputResponse("Launching FetchFund.."),)
+    await ctx.send(sender,UserOutputResponse(response="Launching FetchFund.."),)
 
     # HEARTBEAT AGENT
     try:
-        await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=str(USERINPUT_HBDATA)))
+        await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=str(USERINPUT_HBDATA),))
     except Exception as e:
         ctx.logger.info(f"Error sending data to Heartbeat agent: {e}")
     
+
 
 
 # HEARBEAT AGENT RESPONSE
@@ -354,11 +358,18 @@ async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
 @agent.on_message(model=HeartbeatResponse)
 async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
     session_sender = ctx.storage.get(str(ctx.session))
-    
+    ctx.logger.info(f"{session_sender}")
+
     if (msg.status == "continue"):
         ctx.logger.info(f"Heartbeat agent: Received response{msg.status}. Lets trade")
+        
         rp = f"Heartbeat agent: Received response{msg.status}. Lets trade"
-        await ctx.send(session_sender, create_text_chat(rp),)
+        if session_sender is not None:
+            await ctx.send(session_sender, create_text_chat(rp),)
+        else:
+            user_sender = ctx.storage.get(str(sndr))
+            await ctx.send(user_sender,UserOutputResponse(response=rp),)
+            
         #execute topup_agent to receive funds
 #        if (USERINPUT_AMOUNT_TOPUP > 0):#if 0 then top up not required
 #            fetchwall= (str)(agent.wallet.address())
@@ -374,8 +385,11 @@ async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
     else:
         ctx.logger.info(f"Heartbeat agent: STOP received: canceling the process..: {msg.status}")
         rp = f"Heartbeat agent: STOP received: canceling the process..: {msg.status}"
-        await ctx.send(session_sender, create_text_chat(rp),)
-        
+        if session_sender is not None:
+            await ctx.send(session_sender, create_text_chat(rp),)
+        else:
+            user_sender = ctx.storage.get(str(sndr))
+            await ctx.send(user_sender,UserOutputResponse(response=rp),)
 
 
 
