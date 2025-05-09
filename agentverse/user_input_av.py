@@ -1,4 +1,5 @@
 #agent1q2aczah05l97w8mnen2lcc59y052w8mphzwgv0q37npm9fml2fz5sw2s4vz av
+#fetch1vtyrggrw3nhq3n4p49paum3tt6cwvq9vfga9rx av wallet
 from datetime import datetime
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model
@@ -31,6 +32,7 @@ FGI_AGENT="agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh"#"a
 REASON_AGENT="agent1q2gmk0r2vwk6lcr0pvxp8glvtrdzdej890cuxgegrrg86ue9cahk5nfaf3c" #ASI:One
 
 SWAPLAND_AGENT="agent1qdcpchwle7a5l5q5le0xkswnx4p78jflsnw7tpchjz0dsr2yswepqdvk7at"
+
 
 ## GLOBAL VAR INITIALISATION
 USERINPUT_ASIWALLET_PRIVATEKEY = ""
@@ -188,7 +190,23 @@ class HeartbeatResponse(Model):
         description="stop or continue",
     )
 
+### TOPUP AGENT ###
+class TopupRequest(Model):
+    amount: float = Field(
+        description="Requested amount of FET to be taken from User's wallet and sent to this agent for execution",
+    )
+    agentwallet: str = Field(
+        description="Wallet address of this agent to receive funds from User's wallet",
+    )
+    fetwallet: str = Field(
+        description="User's ASI wallet",
+    )
 
+class TopupResponse(Model):
+    status: str = Field(
+        description="Confirmation of successfull transfer of funds",
+    )
+    
 
 
 
@@ -198,7 +216,7 @@ class HeartbeatResponse(Model):
 async def startup_handler(ctx: Context):
     # Print agent details
     ctx.logger.info(f"My name is {ctx.agent.name} and my address is {ctx.agent.address}")
-
+    ctx.logger.info(f"My wallet address: {agent2.wallet.address()}")
 
 # Message Handler - Process received messages and send acknowledgements
 @chat_proto.on_message(ChatMessage)
@@ -232,6 +250,7 @@ async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledge
 
 @struct_output_client_proto.on_message(StructuredOutputResponse)
 async def handle_structured_output_response(ctx: Context, sender: str, msg: StructuredOutputResponse):
+    global USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_AMOUNT_TOPUP, USERINPUT_NEWS_KEYWORDS
     session_sender = ctx.storage.get(str(ctx.session))
     if session_sender is None:
         ctx.logger.error(
@@ -249,7 +268,6 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         return
 
     try:
-        global USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_AMOUNT_TOPUP, USERINPUT_NEWS_KEYWORDS
 
         # Parse the structured output to get the address
         asi_response = UserInputRequest.parse_obj(msg.output)
@@ -268,7 +286,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         #make sure amount is set to a value
         try:
             int(USERINPUT_AMOUNT_TOPUP)
-            ctx.logger.info("Can be converted to integer")
+            ctx.logger.info(f"Can be converted to integer: {USERINPUT_AMOUNT_TOPUP}.")
         except ValueError:
             ctx.logger.info("Cannot be converted to integer")
             USERINPUT_AMOUNT_TOPUP = 0
@@ -323,16 +341,16 @@ async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
     USERINPUT_RISKSTRATEGY = msg.riskstrategy
     USERINPUT_INVESTORTYPE = msg.investortype
     USERINPUT_REASON = msg.userreason
-    USERINPUT_AMOUNT_TOPUP= msg.amount
+    USERINPUT_AMOUNT_TOPUP = msg.amount
     USERINPUT_NEWS_KEYWORDS=msg.topics
     #ctx.storage.set("sender_address", sender)
     #prompt = f'''This is the data provided: {msg.riskstrategy}'''
 
     try:
         int(USERINPUT_AMOUNT_TOPUP)
-        ctx.logger.info("Can be converted to integer")
+        ctx.logger.info(f"Can be converted to integer: {USERINPUT_AMOUNT_TOPUP}.")
     except ValueError:
-        ctx.logger.info("Cannot be converted to integer")
+        ctx.logger.info("Cannot be converted to integer.")
         USERINPUT_AMOUNT_TOPUP = 0
     
     if not all([USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_NEWS_KEYWORDS]):
@@ -351,17 +369,16 @@ async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
 
 
 # HEARBEAT AGENT RESPONSE
-
-
-
 # Waits for completion of heartbeat agent.
-@agent.on_message(model=HeartbeatResponse)
+@agent2.on_message(model=HeartbeatResponse)
 async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
     session_sender = ctx.storage.get(str(ctx.session))
-    ctx.logger.info(f"{session_sender}")
+    ctx.logger.info(f"Session sender: {session_sender}")
+    
+    global USERINPUT_AMOUNT_TOPUP #global variable not working. needs to be replaced with storage method
 
     if (msg.status == "continue"):
-        ctx.logger.info(f"Heartbeat agent: Received response{msg.status}. Lets trade")
+        ctx.logger.info(f"Heartbeat agent: Received response - {msg.status}. Lets trade")
         
         rp = f"Heartbeat agent: Received response{msg.status}. Lets trade"
         if session_sender is not None:
@@ -371,25 +388,93 @@ async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
             await ctx.send(user_sender,UserOutputResponse(response=rp),)
             
         #execute topup_agent to receive funds
-#        if (USERINPUT_AMOUNT_TOPUP > 0):#if 0 then top up not required
-#            fetchwall= (str)(agent.wallet.address())
-#            await ctx.send(TOPUP_AGENT, TopupRequest(amount=USERINPUT_AMOUNT_TOPUP, agentwallet=fetchwall, fetwallet="empty"))
-#        else:
+        ctx.logger.info(f"Amount to topup: {USERINPUT_AMOUNT_TOPUP}")
+        amounttopup = USERINPUT_AMOUNT_TOPUP
+        if (int(amounttopup) > 0):#if 0 then top up not required
+            fetchwall= (str)(agent2.wallet.address())
+            try:
+                await ctx.send(TOPUP_AGENT, TopupRequest(amount=USERINPUT_AMOUNT_TOPUP, agentwallet=fetchwall, fetwallet="empty123123"))
+                rp = f"Request to Topup Agent for receiving funds sent.."
+                if session_sender is not None:
+                    await ctx.send(session_sender, create_text_chat(rp),)
+                else:
+                    user_sender = ctx.storage.get(str(sndr))
+                    await ctx.send(user_sender,UserOutputResponse(response=rp),)
+            except:
+                rp = f"There was a problem with sending a request to Topup Agent."
+                if session_sender is not None:
+                    await ctx.send(session_sender, create_text_chat(rp),)
+                else:
+                    user_sender = ctx.storage.get(str(sndr))
+                    await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+        else:
             #execute reward_agent to pay fees for using swapland service. this might not be async though
-#            try:
-#                await ctx.send(REWARD_AGENT, PaymentInquiry(ready = "ready"))
-#                ctx.logger.info(f"Ready to pay status sent")
-#            except Exception as e:
-#                logging.error(f"Failed to send request to reward_Agent to pay fees for using swapland services: {e}")
+            try:
+                pass
+                #await ctx.send(REWARD_AGENT, PaymentInquiry(ready = "ready"))
+                ctx.logger.info(f"Ready to pay status sent")
+            except Exception as e:
+                logging.error(f"Failed to send request to Reward Agent to pay fees for using swapland services: {e}")
+
 
     else:
-        ctx.logger.info(f"Heartbeat agent: STOP received: canceling the process..: {msg.status}")
+        ctx.logger.info(f"Heartbeat agent: Received response - {msg.status}. Cancelling the process..")
         rp = f"Heartbeat agent: STOP received: canceling the process..: {msg.status}"
         if session_sender is not None:
             await ctx.send(session_sender, create_text_chat(rp),)
         else:
             user_sender = ctx.storage.get(str(sndr))
             await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+
+
+#USER INPIT agent received requested funds
+#TOPUP AGENT RESPONSE
+@agent2.on_message(model=TopupResponse)
+async def response_funds(ctx: Context, sender: str, msg: TopupResponse):
+    """Handles topup response."""
+    ctx.logger.info(f"📩 User's wallet topped up: {msg.status}.")
+    
+    rp = f"Funds have been received successfully: {msg.status}."
+    if session_sender is not None:
+        await ctx.send(session_sender, create_text_chat(rp),)
+    else:
+        user_sender = ctx.storage.get(str(sndr))
+        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+        
+    #execute reward_agent to pay fees for using swapland service. this might not be async though
+    ledger: LedgerClient = get_ledger()
+    agent_balance = ledger.query_bank_balance(Address(agent2.wallet.address()))/ONETESTFET
+    
+    ctx.logger.info(f"Balance after topup wallet: {agent_balance} TESTFET")
+    rp = f"Balance after topup wallet: {agent_balance} TESTFET"
+    if session_sender is not None:
+        await ctx.send(session_sender, create_text_chat(rp),)
+    else:
+        user_sender = ctx.storage.get(str(sndr))
+        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+    try:
+        pass
+        #await ctx.send(REWARD_AGENT, PaymentInquiry(ready = "ready"))
+        ctx.logger.info(f"Ready to pay status sent")
+        rp = f"Ready to pay status sent to Reward Agent.."
+        if session_sender is not None:
+            await ctx.send(session_sender, create_text_chat(rp),)
+        else:
+            user_sender = ctx.storage.get(str(sndr))
+            await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+    except Exception as e:
+        ctx.logger.error(f"Failed to send request Reward Agent to pay fees for using swapland services: {e}")
+        rp = f"Failed to send request Reward Agent to pay fees for using swapland services: {e}"
+        if session_sender is not None:
+            await ctx.send(session_sender, create_text_chat(rp),)
+        else:
+            user_sender = ctx.storage.get(str(sndr))
+            await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
 
 
 
