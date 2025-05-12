@@ -656,6 +656,18 @@ async def message_handler(ctx: Context, sender: str, msg: SwaplandResponse):
     ctx.logger.info(f"Received message from {sender}: {msg.status}")
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 # Waits for completion of swapland agents. then executes request for reward from reward_agent
 @agent.on_message(model=SwapCompleted)
 async def message_handler(ctx: Context, sender: str, msg: SwapCompleted):

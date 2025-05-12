@@ -1,3 +1,4 @@
+#agent1qt3vcc28ykzrnacsy5nj6k7c88c8r48esp6n25vc0cgtmzwl4m7jcaqvh8c
 import socket
 import time
 from flask import Flask, request, jsonify
@@ -9,12 +10,12 @@ from fetchai.communication import parse_message_from_agent, send_message_to_agen
 import logging
 import os
 from dotenv import load_dotenv
-from uagents import Model
+from uagents import Model, Field
 from uuid import uuid4
 from llm_swapfinder import query_llm
 import requests
 
-import asyncio
+import asyncio # for debug
 
 USERINPUT_ADDRESS="agent1q2aczah05l97w8mnen2lcc59y052w8mphzwgv0q37npm9fml2fz5sw2s4vz"
 
@@ -29,28 +30,35 @@ CORS(app)
 # Initialising client identity to get registered on agentverse
 client_identity = None
 
-#AMOUNT_TO_SWAP = 0
-#PRIVATE_KEY = ""
 
 class SwaplandRequest(Model):
-    blockchain: str
-    signal: str
-    #amount: float
-    private_key: str
+    blockchain: str = Field(
+        description="Blockchain name",
+    )
+    signal: str = Field(
+        description="Buy or Sell signal",
+    )
+    amount: float = Field(
+        description="Amount to be swapped",
+    )
+    private_key: str = Field(
+        description="User's EVM private key",
+    )
 
 class SwaplandResponse(Model):
-    status: str
+    status: str = Field(
+        description="Status response from Swapland Agent",
+    )
 
-# Load environment variables from .env file
-load_dotenv()#this can be removed from here!
+
+
 
 # Function to register agent
 def init_client():
     """Initialize and register the client agent."""
     global client_identity
     try:
-        # Load the agent secret key from environment variables
-        client_identity = Identity.from_seed(("jedijidemphraeyey12eye73782ifjowienowkewmm13131"), 0)
+        client_identity = Identity.from_seed(str(os.getenv("SWAPLAND_SEED")), 0)
         logger.info(f"Client agent started with address: {client_identity.address}")
 
         readme = """
@@ -85,8 +93,9 @@ def init_client():
         logger.info("Quickstart agent registration complete!")
         
         #debug
-        asyncio.sleep(8)
-        search("Sell", "2177jhbekh271giuf3", "base") # test
+        
+        #search("Sell", "2177jhbekh271giuf3", "base", 0.0005) # test
+
         #call_swap("agent1qt40dnmucj0umdf5mryz6qgtmw4q0jrwlxu96h67ldfjgsvf5t9q2uch5hr", private_key)
         #usdcTOeth agent1qt40dnmucj0umdf5mryz6qgtmw4q0jrwlxu96h67ldfjgsvf5t9q2uch5hr
         #ethTOusdc agent1qgl5kptpr3x2t2fnuxnnyf5e8rum8n7u9ett0lv6pqd00k302d72gcygy32
@@ -97,7 +106,7 @@ def init_client():
 
 #send to uAgent
 @app.route('/request', methods=['POST'])
-def send_data():
+def send_data(msg : str):
     """Send payload to the selected agent based on provided address."""
     #global agent_response
     #agent_response = None
@@ -105,7 +114,7 @@ def send_data():
     try:
         # Parse the request payload
         #data = request.json
-        payload = {"status": "Request to Swapland Agent sent."}#data.get('payload')  # Extract the payload dictionary
+        payload = {"status": msg}#data.get('payload')  # Extract the payload dictionary
 
         uagent_address = USERINPUT_ADDRESS #run the uagent.py copy the address and paste here
         
@@ -131,30 +140,27 @@ def send_data():
 @app.route('/api/webhook', methods=['POST'])
 def webhook():
     """Handle incoming messages"""
-    global PRIVATE_KEY
-    global REQUEST_RECEIVED
-    
     try:
         # Parse the incoming webhook message
         data = request.get_data().decode("utf-8")
         logger.info("Received response")
 
         message = parse_message_from_agent(data)
-        REQUEST_RECEIVED = message.payload
+        received_request = message.payload
         
 
-        #AMOUNT_TO_SWAP = message.payload['amount']
-        PRIVATE_KEY = message.payload['private_key']
+        amount_to_swap = message.payload['amount']
+        private_key = message.payload['private_key']
         signal = message.payload['signal']
         network = message.payload['blockchain']
         
-        logger.info(f"Processed response: {REQUEST_RECEIVED}")
+        logger.info(f"Processed response: {received_request}")
         #how do i parse respons into variables? blockchain, signal, amount
-        send_data() #send response status
         
+        send_data("Request to Swapland Agent sent.") #send response status
+
         
-        
-        search(signal,PRIVATE_KEY,network) #debug to be enabled
+        search(signal,private_key,network,amount_to_swap) #debug to be enabled
         
         return jsonify({"status": "success"})
 
@@ -163,9 +169,10 @@ def webhook():
         return jsonify({"error": str(e)}), 500
 
 
-def search(signal:str, privkey:str, netw:str):
+def search(signal:str, privkey:str, netw:str, amt:float):
     # Search for agents matching the query
     # API endpoint and payload
+    
     api_url = "https://agentverse.ai/v1/search/agents"
     
     query = "tag:fetchfundswapland"
@@ -211,17 +218,26 @@ def search(signal:str, privkey:str, netw:str):
             #logger.info(f"{prompt}")
         
         #print(prompt)  # Debugging log
+    
+        send_data(str(prompt)) #reenable this! #send response data could be large?
+            
         logger.info("Request sent to ASI1 model to evaluate the list of discovered agents..")
         
         
         response = query_llm(prompt)  # Query the AI for a decision
                 
         logger.info(f"{response}")
+        
+        msg = f"Search engine has found the agent for swap: {response}."
 
-        #call_swap(str(response), privkey) # further execution!
-
+        send_data(msg) #reenable this!
+                        
+        try:
+            pass
+            #call_swap(str(response), privkey, amt) # further execution!
+        except Exception as e:
+            logger.error(f"Error calling for swap: {e}")
         logger.info("Program completed")
-
     else:
         logger.info(f"Request failed with status code {response.status_code}")
 
@@ -229,7 +245,7 @@ def search(signal:str, privkey:str, netw:str):
 
 
 
-def call_swap(swapaddress : str, metamask_key : str):
+def call_swap(agentaddress : str, metamask_key : str, amount : float):
    """Send payload to the selected agent based on provided address."""
    try:
        # Parse the request payload
@@ -237,17 +253,15 @@ def call_swap(swapaddress : str, metamask_key : str):
        payload = {
         "variable": "swapland something",#'<query>', tag:{tagid} tag:swaplandbaseethusdc
         "metamask_key": metamask_key,#metamask_key
-        "amount": AMOUNT_TO_SWAP
+        "amount": amount
         }
         
-
-       agent_address = swapaddress
-       logger.info(f"Sending payload to agent: {swapaddress}")
+       logger.info(f"Sending payload to agent: {agentaddress}")
 
        # Send the payload to the specified agent
        send_message_to_agent(
            client_identity,  # Frontend client identity
-           agent_address,    # Agent address where we have to send the data
+           agentaddress,    # Agent address where we have to send the data
            payload           # Payload containing the data
        )
 
@@ -258,7 +272,7 @@ def call_swap(swapaddress : str, metamask_key : str):
 
 
 if __name__ == "__main__":
+    load_dotenv()
     init_client()       #Register your agent on Agentverse
     app.run(host="0.0.0.0", port=5008)
-
-    #main()
+    
