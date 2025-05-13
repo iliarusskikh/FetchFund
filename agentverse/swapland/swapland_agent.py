@@ -18,7 +18,7 @@ import requests
 import asyncio # for debug
 
 USERINPUT_ADDRESS="agent1q2aczah05l97w8mnen2lcc59y052w8mphzwgv0q37npm9fml2fz5sw2s4vz"
-
+DISPATCHER_ADDRESS="agent1qw7k3cfqnexa08a3wwuggznd3cduuse469uz7kja6ugn85erdjnsqc7ap9a"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -84,7 +84,7 @@ def init_client():
         # Register the agent with Agentverse
         register_with_agentverse(
             identity=client_identity,
-            url="http://localhost:5008/api/webhook",
+            url="http://localhost:5012/api/webhook",
             agentverse_token=os.getenv("AGENTVERSE_API_KEY"),
             agent_title="Swapland finder agent",
             readme=readme
@@ -116,7 +116,7 @@ def send_data(msg : str):
         #data = request.json
         payload = {"status": msg}#data.get('payload')  # Extract the payload dictionary
 
-        uagent_address = USERINPUT_ADDRESS #run the uagent.py copy the address and paste here
+        uagent_address = DISPATCHER_ADDRESS #run the uagent.py copy the address and paste here
         
         # Build the Data Model digest for the Request model to ensure message format consistency between the uAgent and AI Agent
         model_digest = Model.build_schema_digest(SwaplandResponse)
@@ -223,7 +223,6 @@ def search(signal:str, privkey:str, netw:str, amt:float):
             
         logger.info("Request sent to ASI1 model to evaluate the list of discovered agents..")
         
-        
         response = query_llm(prompt)  # Query the AI for a decision
                 
         logger.info(f"{response}")
@@ -274,5 +273,5 @@ def call_swap(agentaddress : str, metamask_key : str, amount : float):
 if __name__ == "__main__":
     load_dotenv()
     init_client()       #Register your agent on Agentverse
-    app.run(host="0.0.0.0", port=5008)
+    app.run(host="0.0.0.0", port=5012)
     

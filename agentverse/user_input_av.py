@@ -41,9 +41,8 @@ REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
 COININFO_AGENT="agent1qthmuhfu5xlu4s8uwlq7z2ghxhpdqpj2r8smaushxu0qr3k3zcwuxu87t0t"
 CRYPTONEWS_AGENT="agent1qgy6eh453lucsvgg30fffd70umcq6fwt2wgx9ksyfxnw45wu4ravs26rvt6" #mailbox
 FGI_AGENT="agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh"#"agent1qfyrgg8w5pln25a6hcu3a3rx534lhs32aryqr5gx08djdclakzuex98dwzn" mailbox
-
-SWAPLAND_AGENT="agent1qdcpchwle7a5l5q5le0xkswnx4p78jflsnw7tpchjz0dsr2yswepqdvk7at"
-
+SWAPLAND_AGENT="agent1qt3vcc28ykzrnacsy5nj6k7c88c8r48esp6n25vc0cgtmzwl4m7jcaqvh8c"
+DISPATCHER_AGENT="agent1qw7k3cfqnexa08a3wwuggznd3cduuse469uz7kja6ugn85erdjnsqc7ap9a"
 
 ## GLOBAL VAR INITIALISATION
 #USERINPUT_ASIWALLET_PRIVATEKEY = ""
@@ -279,6 +278,32 @@ class FGIResponse(Model):
     status: str
     timestamp: str
 
+### SWAPLAND AGENT ###
+class DispatcherRequest(Model):
+    blockchain: str = Field(
+        description="Blockchain name",
+    )
+    signal: str = Field(
+        description="Buy or Sell signal",
+    )
+    amount: float = Field(
+        description="Amount to be swapped",
+    )
+    private_key: str = Field(
+        description="User's EVM private key",
+    )
+    sessionsender : str = Field(
+        description="Required to preserve a session sender",
+    )
+
+
+class DispatcherResponse(Model):
+    status : str = Field(
+        description="Status response from Swapland Agent",
+    )
+    sessionsender : str = Field(
+        description="Required to preserve a session sender",
+    )
 
 
 
@@ -389,9 +414,19 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         #start the program
         #HEARTBEAT AGENT
         try:
-            await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=str(USERINPUT_HBDATA)))
+            signal = "Sell"#"tag:fetchfundbaseethusdc"
+            amountt = 0.00007 #ETH to USDC
+            asi_network = "base network"
+            asi_evmkey = "hfiuh8347hf98n832f3"
+            
+            await ctx.send(DISPATCHER_AGENT, DispatcherRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt, sessionsender = session_sender))
+
+            #await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=str(USERINPUT_HBDATA)))
         except Exception as e:
-            ctx.logger.info(f"Error sending data to Heartbeat agent: {e}")
+            rp=f"Error sending data to Heartbeat agent: {e}"
+            ctx.logger.info(rp)
+            await ctx.send(session_sender, create_text_chat(rp),)
+
         
     except Exception as err:
         ctx.logger.error(err)
@@ -802,6 +837,8 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
     user_sender = ctx.storage.get("SENDER_ADDRESS")
     asi_counter = ctx.storage.get("ASI_COUNTER")
 
+    asi_evmkey = ctx.storage.get("USERINPUT_EVMWALLET_PRIVATEKEY")
+
     asi_fgi = ctx.storage.get("ASI_FGI")
     asi_cryptonews = ctx.storage.get("ASI_CRYPTONEWS")
     asi_coininfo = ctx.storage.get("ASI_COININFO")
@@ -864,7 +901,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
             else:
                 await ctx.send(user_sender,UserOutputResponse(response=rp),)
             return
-    
+
     else:
         rp = f"Reason Agent iterations completed."
         ctx.logger.info(rp)
@@ -872,6 +909,86 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
             await ctx.send(session_sender, create_text_chat(rp),)
         else:
             await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+        if (("SELL" in msg.text) or ("BUY" in msg.text)):
+            try:
+                signal=""
+                
+                if "BUY" in msg.text:
+                    rp = f"🚨 BUY SIGNAL DETECTED!"
+                    ctx.logger.info(rp)
+                    if session_sender is not None:
+                        await ctx.send(session_sender, create_text_chat(rp),)
+                    else:
+                        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+                    signal = "Buy"#"tag:fetchfundbaseusdceth"#Buy ETH signal. Convert USDC to ETH
+                    amountt = 0.1 #usdc to eth
+                
+                elif "SELL" in msg.text:
+                    rp = f"✅ SELL SIGNAL DETECTED!"
+                    ctx.logger.info(rp)
+                    if session_sender is not None:
+                        await ctx.send(session_sender, create_text_chat(rp),)
+                    else:
+                        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+                    #make signal a tag, so that a search query is constructed here "swaplandusdctoeth", then add this to search( ... )
+                    signal = "Sell"#"tag:fetchfundbaseethusdc"
+                    amountt = 0.00007 #ETH to USDC
+
+                await ctx.send(DISPATCHER_AGENT, DispatcherRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt, sessionsender = session_sender))
+
+            except Exception as e:
+                rp = f"Failed to send a request to Swapfinder Agent: {e}."
+                ctx.logger.info(rp)
+                if session_sender is not None:
+                    await ctx.send(session_sender, create_text_chat(rp),)
+                else:
+                    await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+        elif ("HOLD" in msg.text):
+            rp = f"⏳ HOLD decision received."
+            ctx.logger.info(rp)
+            if session_sender is not None:
+                await ctx.send(session_sender, create_text_chat(rp),)
+            else:
+                await ctx.send(user_sender,UserOutputResponse(response=rp),)
+            
+            try:
+                pass
+                #await ctx.send(REWARD_AGENT, RewardRequest(status="reward"))
+            except Exception as e:
+                ctx.logger.error(f"Failed to send request for reward: {e}.")
+        else:
+            rp = f"Could not recognize the response from Reason Agent."
+            ctx.logger.error(rp)
+            if session_sender is not None:
+                await ctx.send(session_sender, create_text_chat(rp),)
+            else:
+                await ctx.send(user_sender,UserOutputResponse(response=rp),)
+            return
+        
+
+
+# Handle incoming messages with the SwaplandResponse model from ai agent swapfinder_agent
+@agent2.on_message(model=DispatcherResponse)
+async def dispatcher_handler(ctx: Context, sender: str, msg: DispatcherResponse):
+    session_check = ctx.storage.get(str(ctx.session))
+    ctx.logger.info(f"session none: {session_check} ")
+
+    session_sender = str(msg.sessionsender)
+    user_sender = ctx.storage.get("SENDER_ADDRESS")
+    ctx.logger.info(f"session: {session_sender} ")
+    rp = f"Swapland Agent: done"#{msg.status}
+    ctx.logger.info(rp)
+    if session_sender is not None:
+        await ctx.send(session_sender, create_text_chat(rp),)
+    else:
+        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+
+
 
 
 #########################################################################
