@@ -1,4 +1,4 @@
-# mailbox
+# "agent1qw7k3cfqnexa08a3wwuggznd3cduuse469uz7kja6ugn85erdjnsqc7ap9a" mailbox
 from datetime import datetime
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model, Field
@@ -87,7 +87,7 @@ class SwaplandResponse(Model):
 
 
 
-class SwapCompleted(Model):
+class DispatcherCompleted(Model):
     status: str= Field(
         description="Status response from Swapland Agent",
     )
@@ -95,6 +95,19 @@ class SwapCompleted(Model):
         description="Additional information",
     )
     sessionsender : str
+    
+
+
+class SwapCompleted(Model):
+    status: str= Field(
+        description="Status response from Swapland Agent",
+    )
+    message: str = Field(
+        description="Additional information",
+    )
+    transaction : str = Field(
+        description="Transaction info",
+    )
     
     
 class DispatcherRequest(Model):
@@ -109,6 +122,9 @@ class DispatcherRequest(Model):
     )
     private_key: str = Field(
         description="User's EVM private key",
+    )
+    transaction : str = Field(
+        description="Transaction info",
     )
     sessionsender : str = Field(
         description="Required to preserve a session sender",
@@ -174,7 +190,7 @@ async def message_handler(ctx: Context, sender: str, msg: SwaplandResponse):
 @proto.on_message(model=SwapCompleted)
 async def message_handler(ctx: Context, sender: str, msg: SwapCompleted):
     logging.info(f"{msg}")
-    await ctx.send(USERINPUT_AGENT_ADDRESS, SwapCompleted(status = msg.status,message = msg.message, sessionsender = seshsender))
+    await ctx.send(USERINPUT_AGENT_ADDRESS, DispatcherCompleted(status = msg.status,message = msg.message, transaction = msg.transaction, sessionsender = seshsender))
  
 
 agent2.include(proto, publish_manifest=True)

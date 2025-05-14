@@ -244,6 +244,7 @@ def search(signal:str, privkey:str, netw:str, amt:float):
 
 
 
+
 def call_swap(agentaddress : str, metamask_key : str, amount : float):
    """Send payload to the selected agent based on provided address."""
    try:
@@ -251,7 +252,7 @@ def call_swap(agentaddress : str, metamask_key : str, amount : float):
        #AMOUNT_TO_SWAP = 0.0001
        payload = {
         "variable": "swapland something",#'<query>', tag:{tagid} tag:swaplandbaseethusdc
-        "metamask_key": metamask_key,#metamask_key
+        "private_key": metamask_key,#metamask_key
         "amount": amount
         }
         
