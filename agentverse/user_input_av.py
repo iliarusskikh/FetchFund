@@ -41,7 +41,7 @@ REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
 COININFO_AGENT="agent1qthmuhfu5xlu4s8uwlq7z2ghxhpdqpj2r8smaushxu0qr3k3zcwuxu87t0t"
 CRYPTONEWS_AGENT="agent1qgy6eh453lucsvgg30fffd70umcq6fwt2wgx9ksyfxnw45wu4ravs26rvt6" #mailbox
 FGI_AGENT="agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh"#"agent1qfyrgg8w5pln25a6hcu3a3rx534lhs32aryqr5gx08djdclakzuex98dwzn" mailbox
-SWAPLAND_AGENT="agent1qt3vcc28ykzrnacsy5nj6k7c88c8r48esp6n25vc0cgtmzwl4m7jcaqvh8c"
+SWAPLAND_AGENT="agent1qtfvyq7g96yym6cawgj3u3xquuldjy4pa0j0snc8jdaaw5phpqd6j60ntf7"
 DISPATCHER_AGENT="agent1qw7k3cfqnexa08a3wwuggznd3cduuse469uz7kja6ugn85erdjnsqc7ap9a"
 
 ## GLOBAL VAR INITIALISATION
@@ -279,7 +279,7 @@ class FGIResponse(Model):
     timestamp: str
 
 ### SWAPLAND AGENT ###
-class DispatcherRequest(Model):
+class SwaplandRequest(Model):
     blockchain: str = Field(
         description="Blockchain name",
     )
@@ -292,20 +292,23 @@ class DispatcherRequest(Model):
     private_key: str = Field(
         description="User's EVM private key",
     )
-    sessionsender : str = Field(
-        description="Required to preserve a session sender",
-    )
 
-
-class DispatcherResponse(Model):
+class SwaplandResponse(Model):
     status : str = Field(
         description="Status response from Swapland Agent",
     )
-    sessionsender : str = Field(
-        description="Required to preserve a session sender",
+
+    
+class SwapCompleted(Model):
+    status: str= Field(
+        description="Status response from Swapland Agent",
     )
-
-
+    message: str = Field(
+        description="Additional information",
+    )
+    transaction : str = Field(
+        description="Transaction info",
+    )
 
 
 # Startup Handler - Print agent details
@@ -419,7 +422,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
             asi_network = "base network"
             asi_evmkey = "hfiuh8347hf98n832f3"
             
-            await ctx.send(DISPATCHER_AGENT, DispatcherRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt, sessionsender = session_sender))
+            await ctx.send(SWAPLAND_AGENT, SwaplandRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt))
 
             #await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=str(USERINPUT_HBDATA)))
         except Exception as e:
@@ -937,7 +940,15 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                     signal = "Sell"#"tag:fetchfundbaseethusdc"
                     amountt = 0.00007 #ETH to USDC
 
-                await ctx.send(DISPATCHER_AGENT, DispatcherRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt, sessionsender = session_sender))
+                await ctx.send(SWAPLAND_AGENT, SwaplandRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt))
+                rp = f"Request to Swapfinder Agent sent."
+                ctx.logger.info(rp)
+                if session_sender is not None:
+                    await ctx.send(session_sender, create_text_chat(rp),)
+                else:
+                    await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+
 
             except Exception as e:
                 rp = f"Failed to send a request to Swapfinder Agent: {e}."
@@ -972,15 +983,26 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
 
 
 # Handle incoming messages with the SwaplandResponse model from ai agent swapfinder_agent
-@agent2.on_message(model=DispatcherResponse)
-async def dispatcher_handler(ctx: Context, sender: str, msg: DispatcherResponse):
-    session_check = ctx.storage.get(str(ctx.session))
-    ctx.logger.info(f"session none: {session_check} ")
-
-    session_sender = str(msg.sessionsender)
+@agent2.on_message(model=SwaplandResponse)
+async def dispatcher_handler(ctx: Context, sender: str, msg: SwaplandResponse):
+    session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
-    ctx.logger.info(f"session: {session_sender} ")
-    rp = f"Swapland Agent: done"#{msg.status}
+
+    rp = f"Swapland Agent: {msg.status}"
+    ctx.logger.info(rp)
+    if session_sender is not None:
+        await ctx.send(session_sender, create_text_chat(rp),)
+    else:
+        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+
+# Handle incoming messages with the SwapCompleted model from Swap agent
+@agent2.on_message(model=SwapCompleted)
+async def swapcomp_handler(ctx: Context, sender: str, msg: SwapCompleted):
+    session_sender = ctx.storage.get(str(ctx.session))
+    user_sender = ctx.storage.get("SENDER_ADDRESS")
+
+    rp = f"Swap agent: {msg.status}. {msg.message}. {msg.transaction}"
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)

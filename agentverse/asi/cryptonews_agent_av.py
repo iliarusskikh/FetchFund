@@ -1,6 +1,5 @@
 #pip install newsapi-python
 #agent1qgy6eh453lucsvgg30fffd70umcq6fwt2wgx9ksyfxnw45wu4ravs26rvt6 mailbox
-from datetime import datetime
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model, Field
 from uagents.experimental.quota import QuotaProtocol, RateLimit

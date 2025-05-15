@@ -1,47 +1,70 @@
-# agent address
-import datetime
-import decimal
+#agent1qwpv6dygtaq2ptdnmdd3mzqnsh38pmecxsddkc4lsy9sx7kea2t82dfv6g2 mailbox address
+
+from uuid import uuid4
+from uagents import Agent, Protocol, Context, Model, Field
+from uagents.experimental.quota import QuotaProtocol, RateLimit
+
+import os
+import logging
 import sys
+import requests
+import atexit
+from dotenv import load_dotenv
+import json
+from typing import Optional
+from datetime import datetime, timedelta
+from typing import Any
+import decimal
 from decimal import Decimal
 
-from threading import Thread
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from uagents_core.identity import Identity
-from fetchai import fetch
-from fetchai.registration import register_with_agentverse
-from fetchai.communication import parse_message_from_agent, send_message_to_agent
-import logging
-import os
-from dotenv import load_dotenv
-from uagents import Model
-from uuid import uuid4
-from llm_swapfinder import query_llm
-import requests
-
- 
 #uniswap libraries
-from uniswap_universal_router_decoder import FunctionRecipient, RouterCodec
+from uniswap_universal_router_decoder import FunctionRecipient, RouterCodec, V4Constants
 from web3 import Account, Web3
-import os
 
 
-DISPATCHER_AGENT="agent1qw7k3cfqnexa08a3wwuggznd3cduuse469uz7kja6ugn85erdjnsqc7ap9a"
+load_dotenv()
+SELLBASE_SEED = os.getenv("SELLBASE_SEED")
 
+USERINPUT_AGENT="agent1q2aczah05l97w8mnen2lcc59y052w8mphzwgv0q37npm9fml2fz5sw2s4vz"
 chain_id = 8453
 rpc_endpoint = "https://mainnet.base.org"
 
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Configure Logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-flask_app = Flask(__name__)
-CORS(flask_app)
+# Log on exit
+def log_and_exit():
+    logging.debug("🚨 Script terminated unexpectedly")
+atexit.register(log_and_exit)
 
-# Initialising client identity to get registered on agentverse
-client_identity = None
+# Catch unexpected errors
+def handle_unexpected_exception(exc_type, exc_value, exc_traceback):
+    logging.error("🔥 Uncaught Exception:", exc_info=(exc_type, exc_value, exc_traceback))
+sys.excepthook = handle_unexpected_exception
+
+
+class SwaplandRequest(Model):
+    blockchain: str = Field(
+        description="Blockchain name",
+    )
+    signal: str = Field(
+        description="Buy or Sell signal",
+    )
+    amount: float = Field(
+        description="Amount to be swapped",
+    )
+    private_key: str = Field(
+        description="User's EVM private key",
+    )
     
+    
+class SwaplandResponse(Model):
+    status: str = Field(
+        description="Status response from Swapland Agent",
+    )
+
 class SwapCompleted(Model):
     status: str= Field(
         description="Status response from Swapland Agent",
@@ -53,123 +76,70 @@ class SwapCompleted(Model):
         description="Transaction info",
     )
     
-    
-# Load environment variables from .env file
-load_dotenv()#this can be removed from here!
+
+# Initialize Agent
+agent2 = Agent(
+    name="FetchFund - Sell signal on base agent",
+    port=8020,
+    seed=SELLBASE_SEED,
+    mailbox = True,
+    #readme_path = "README_sellbase.md",
+    )
 
 
-# Function to register agent
-def init_client():
-    """Initialize and register the client agent."""
-    global client_identity
-    try:
-        # Load the agent secret key from environment variables
-        client_identity = Identity.from_seed(str(os.getenv("SELLBASE_SEED")), 0)
-        logger.info(f"Client agent started with address: {client_identity.address}")
-        readme = """
-![domain:innovation-lab](https://img.shields.io/badge/innovation--lab-3D8BD3)
-![domain:fetchfund](https://img.shields.io/badge/fetchfund-3D23DD)
-![tag:fetchfundswapland](https://img.shields.io/badge/fetchfundswapland-4648A3)
-
-<description> Sell signal on base netowork. Executes ETH-to-USDC swaps on Base. Fetchfund agent which uses uniswapV2 smart contract to sell ETH (swap ETH into USDC) on base network.</description>
-<use_cases>
-    <use_case>Receives a value for amount of ETH that needs to be swapped into USDC on base network.</use_case>
-</use_cases>
-
-<payload_requirements>
-<description>Expects the float number which defines how many ETH needs to be converted into USDC.</description>
-    <payload>
-          <requirement>
-              <parameter>amount</parameter>
-              <description>Amount of ETH to be converted into USDC.</description>
-          </requirement>
-    </payload>
-</payload_requirements>
-"""
-
-        
-        # Register the agent with Agentverse
-        register_with_agentverse(
-            identity=client_identity,
-            url="http://localhost:5016/api/webhook",
-            agentverse_token=os.getenv("AGENTVERSE_API_KEY"),
-            agent_title="FetchFund - Sell signal on Base",
-            readme=readme
-        )
-
-        logger.info("Quickstart agent registration complete!")
-
-    except Exception as e:
-        logger.error(f"Initialization error: {e}")
-        raise
+@agent2.on_event("startup")
+async def startup_handler(ctx: Context):
+    logger.info(f"My name is {ctx.agent.name} and my address is {ctx.agent.address}")
 
 
-# app route to recieve the messages from other agents
-@flask_app.route('/api/webhook', methods=['POST'])
-def webhook():
+
+
+
+@agent2.on_message(model=SwaplandRequest)
+async def handle_message(ctx: Context, sender: str, msg: SwaplandRequest):
     """Handle incoming messages"""
     global agent_response
     try:
-        # Parse the incoming webhook message
-        data = request.get_data().decode("utf-8")
-        logger.info("Received response")
-
-        message = parse_message_from_agent(data)
-        evmkey = str(message.payload['private_key'])
-        amount = message.payload['amount']
-                
-        logger.info(f"Processed response: {evmkey}")
+        amount_to_swap = msg.amount
+        private_key = msg.private_key
+        signal = msg.signal
+        network = msg.blockchain
         
-        execute_swap(amount, evmkey) ##already converted to ETH value
+        logger.info(f"Processed response: {msg}")
+        
+        rpl = "Swapping in progress.."
+        rp = SwaplandResponse(status = rpl)
+        await ctx.send(USERINPUT_AGENT,rp)
+        
+        try:
+            await execute_swap(ctx, sender, msg) #do the swap
+        except Exception as e:
+            rpl = f"Error sending data to agent: {e}"
+            logger.error(rpl)
+            rp = SwaplandResponse(status = rpl)
+            await ctx.send(USERINPUT_AGENT,rp)
+        
         logger.info(f"Called function execute_swap")
         return jsonify({"status": "success"})
 
     except Exception as e:
-        logger.error(f"Error in webhook: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-#send to uAgent
-@flask_app.route('/request', methods=['POST'])
-def send_status(transac : str):
-    """Send payload to the selected agent based on provided address."""
-    global agent_response
-    agent_response = None
-
-    try:
-        # Parse the request payload
-        #data = request.json
-        #Successfully executed Swapland Agent to convert ETH to USDC!
-        payload = {"message": "Successfully executed Swapland Agent to convert ETH to USDC!", "status":"swapcompleted", "transaction": str(transac)}#data.get('payload')  # Extract the payload dictionary
-
-        uagent_address = DISPATCHER_AGENT #run the uagent.py copy the address and paste here
-        
-        # Build the Data Model digest for the Request model to ensure message format consistency between the uAgent and AI Agent
-        model_digest = Model.build_schema_digest(SwapCompleted)
-
-        # Send the payload to the specified agent
-        send_message_to_agent(
-            client_identity,  # Frontend client identity
-            uagent_address,  # Agent address where we have to send the data
-            payload,  # Payload containing the data
-            model_digest=model_digest
-        )
-
-        return jsonify({"status": "swapcompleted", "payload": payload})
-
-    except Exception as e:
-        logger.error(f"Error sending data to agent: {e}")
+        rpl = f"Error in webhook: {e}"
+        logger.error(rpl)
+        rp = SwaplandResponse(status = rpl)
+        await ctx.send(USERINPUT_AGENT,rp)
         return jsonify({"error": str(e)}), 500
 
 
 
-def execute_swap(amount : float, private_key : str):
+
+
+async def execute_swap(ctx: Context, sender: str, msg: SwaplandRequest):
     try:
         uni_address = Web3.to_checksum_address('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913')
         uni_abi = '[{"inputs":[{"internalType":"address","name":"implementationContract","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"previousAdmin","type":"address"},{"indexed":false,"internalType":"address","name":"newAdmin","type":"address"}],"name":"AdminChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"implementation","type":"address"}],"name":"Upgraded","type":"event"},{"stateMutability":"payable","type":"fallback"},{"inputs":[],"name":"admin","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newAdmin","type":"address"}],"name":"changeAdmin","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"implementation","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newImplementation","type":"address"}],"name":"upgradeTo","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newImplementation","type":"address"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"upgradeToAndCall","outputs":[],"stateMutability":"payable","type":"function"}]'
 
         #amount_in = int(0.0001 * 10**18)#18  working with 4
-        amount_in = int(amount * 10**18)
+        amount_in = int(msg.amount * 10**18)
         min_amount_out = 1 * 10**4 #10**6 == 1USDC  working with 5
 
         weth_address = Web3.to_checksum_address('0x4200000000000000000000000000000000000006')
@@ -203,7 +173,7 @@ def execute_swap(amount : float, private_key : str):
         #    send_status()  # Send success status to main agent
         #    return
             
-        account = Account.from_key(private_key)
+        account = Account.from_key(msg.private_key)
 
         trx_params = {
                 "from": account.address,
@@ -224,15 +194,19 @@ def execute_swap(amount : float, private_key : str):
         logger.info(f"Successfully converted from ETH to USDC.")
         
         trxhash = "basescan.org/tx/"+str(w3.to_hex(trx_hash))
-        send_status(trxhash)  # Send status to main agent
+        
+        rp = SwapCompleted(status = "success", message = "Successfully swapped ETH to USDC.", transaction = trxhash)
+        await ctx.send(USERINPUT_AGENT,rp)
+        
     except Exception as e:
-        logger.error(f"Error in execute_swap: {e}")
+        ero=f"Error in execute_swap: {e}"
+        logger.error(ero)
         # Still send successful status to keep the flow going
-        trxhash="error"
-        send_status(trxhash)
+        trxhash="None"
+        rp = SwapCompleted(status = "fail", message = ero , transaction = trxhash)
+        await ctx.send(USERINPUT_AGENT,rp)
 
 
-if __name__ == "__main__":
-    load_dotenv()
-    init_client()
-    Thread(target=lambda: flask_app.run(host="0.0.0.0", port=5016, debug=True, use_reloader=False)).start()
+
+if __name__ == '__main__':
+    agent2.run()

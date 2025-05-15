@@ -1,48 +1,70 @@
-#agent address
+#agent1qfjda5fqgu3qwvcww8z3jwwnsf9rhq0x09y27f0z2lkphszjl4gcwdp8h5u mailbox address
 
-import datetime
-import decimal
+from uuid import uuid4
+from uagents import Agent, Protocol, Context, Model, Field
+from uagents.experimental.quota import QuotaProtocol, RateLimit
+
+import os
+import logging
 import sys
+import requests
+import atexit
+from dotenv import load_dotenv
+import json
+from typing import Optional
+from datetime import datetime, timedelta
+from typing import Any
+import decimal
 from decimal import Decimal
 
-from threading import Thread
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-#from uagents_core.crypto import Identity
-from uagents_core.identity import Identity
-from fetchai import fetch
-from fetchai.registration import register_with_agentverse
-from fetchai.communication import parse_message_from_agent, send_message_to_agent
-import logging
-import os
-from dotenv import load_dotenv
-from uagents import Model
-#from fetchai.crypto import Identity
-from uuid import uuid4
-from llm_swapfinder import query_llm
-import requests
- 
 #uniswap libraries
 from uniswap_universal_router_decoder import FunctionRecipient, RouterCodec, V4Constants
 from web3 import Account, Web3
-import os
 
 
-DISPATCHER_AGENT="agent1qw7k3cfqnexa08a3wwuggznd3cduuse469uz7kja6ugn85erdjnsqc7ap9a"
+load_dotenv()
+BUYBASE_SEED = os.getenv("BUYBASE_SEED")
 
+USERINPUT_AGENT="agent1q2aczah05l97w8mnen2lcc59y052w8mphzwgv0q37npm9fml2fz5sw2s4vz"
 chain_id = 8453
 rpc_endpoint = "https://mainnet.base.org"
  
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Configure Logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-flask_app = Flask(__name__)
-CORS(flask_app)
+# Log on exit
+def log_and_exit():
+    logging.debug("🚨 Script terminated unexpectedly")
+atexit.register(log_and_exit)
 
-# Initialising client identity to get registered on agentverse
-client_identity = None
+# Catch unexpected errors
+def handle_unexpected_exception(exc_type, exc_value, exc_traceback):
+    logging.error("🔥 Uncaught Exception:", exc_info=(exc_type, exc_value, exc_traceback))
+sys.excepthook = handle_unexpected_exception
+
+
+class SwaplandRequest(Model):
+    blockchain: str = Field(
+        description="Blockchain name",
+    )
+    signal: str = Field(
+        description="Buy or Sell signal",
+    )
+    amount: float = Field(
+        description="Amount to be swapped",
+    )
+    private_key: str = Field(
+        description="User's EVM private key",
+    )
     
+    
+class SwaplandResponse(Model):
+    status: str = Field(
+        description="Status response from Swapland Agent",
+    )
+
 class SwapCompleted(Model):
     status: str= Field(
         description="Status response from Swapland Agent",
@@ -54,121 +76,69 @@ class SwapCompleted(Model):
         description="Transaction info",
     )
     
-# Load environment variables from .env file
-load_dotenv()#this can be removed from here!
+
+# Initialize Agent
+agent2 = Agent(
+    name="FetchFund - Buy signal on base agent",
+    port=8019,
+    seed=BUYBASE_SEED,
+    mailbox = True,
+    #readme_path = "README_buybase.md",
+    )
 
 
-# Function to register agent
-def init_client():
-    """Initialize and register the client agent."""
-    global client_identity
-    try:
-        #![domain:innovation-lab](https://img.shields.io/badge/innovation--lab-3D8BD3)
-            #domain:domain-of-your-agent
-        # Load the agent secret key from environment variables
-        client_identity = Identity.from_seed(str(os.getenv("BUYBASE_SEED")), 0)
-        logger.info(f"Client agent started with address: {client_identity.address}")
-        readme = """
-![domain:innovation-lab](https://img.shields.io/badge/innovation--lab-3D8BD3)
-![domain:fetchfund](https://img.shields.io/badge/fetchfund-3D23DD)
-![tag:fetchfundswapland](https://img.shields.io/badge/fetchfundswapland-4648A3)
-
-<description>Buy signal on base netowork. Executes USDC-to-ETH swaps on Base. Fetchfund agent which uses uniswapV2 smart contract to buy ETH (swap USDC into ETH) on base network.</description>
-<use_cases>
-    <use_case>Receives a value for amount of USDC that needs to be swapped into ETH on base network.</use_case>
-</use_cases>
-
-<payload_requirements>
-<description>Expects the float number which defines how many USDC needs to be converted into ETH.</description>
-    <payload>
-          <requirement>
-              <parameter>amount</parameter>
-              <description>Amount of USDC to be converted into ETH.</description>
-          </requirement>
-    </payload>
-</payload_requirements>
-"""
-
-        
-        # Register the agent with Agentverse
-        register_with_agentverse(
-            identity=client_identity,
-            url="http://localhost:5015/api/webhook",
-            agentverse_token=os.getenv("AGENTVERSE_API_KEY"),
-            agent_title="FetchFund - Buy signal on Base",
-            readme=readme
-        )
-
-        logger.info("Quickstart agent registration complete!")
-
-    except Exception as e:
-        logger.error(f"Initialization error: {e}")
-        raise
+@agent2.on_event("startup")
+async def startup_handler(ctx: Context):
+    # Print agent details
+    logger.info(f"My name is {ctx.agent.name} and my address is {ctx.agent.address}")
 
 
-# app route to recieve the messages from other agents
-@flask_app.route('/api/webhook', methods=['POST'])
-def webhook():
+
+
+
+
+
+
+@agent2.on_message(model=SwaplandRequest)
+async def handle_message(ctx: Context, sender: str, msg: SwaplandRequest):
     """Handle incoming messages"""
     global agent_response
     try:
-        # Parse the incoming webhook message
-        data = request.get_data().decode("utf-8")
-        logger.info("Received response")
-
-        message = parse_message_from_agent(data)
-        evmkey = str(message.payload['private_key'])
-        amount = message.payload['amount'] #already converted to USDC value
+        amount_to_swap = msg.amount
+        private_key = msg.private_key
+        signal = msg.signal
+        network = msg.blockchain
+        
+        logger.info(f"Processed response: {msg}")
                 
-        logger.info(f"Processed response: {evmkey}")
+        rpl = "Swapping in progress.."
+        rp = SwaplandResponse(status = rpl)
+        await ctx.send(USERINPUT_AGENT,rp)
         
         try:
-            execute_swap(amount, evmkey) #do the swap
+            await execute_swap(ctx, sender, msg) #do the swap
         except Exception as e:
-            logger.error(f"Error sending data to agent: {e}")
-            send_status("error")
+            rpl = f"Error sending data to agent: {e}"
+            logger.error(rpl)
+            rp = SwaplandResponse(status = rpl)
+            await ctx.send(USERINPUT_AGENT,rp)
             
         
         logger.info(f"Called function execute_swap")
         return jsonify({"status": "success"})
 
     except Exception as e:
-        logger.error(f"Error in webhook: {e}")
-        send_status("error")
+        rpl = f"Error in webhook: {e}"
+        logger.error(rpl)
+        rp = SwaplandResponse(status = rpl)
+        await ctx.send(USERINPUT_AGENT,rp)
         return jsonify({"error": str(e)}), 500
 
 
-#send to uAgent
-@flask_app.route('/request', methods=['POST'])
-def send_status(transac : str):
-    """Send payload to the selected agent based on provided address."""
-    
-    try:
-        # Parse the request payload
-        #data = request.json
-        payload = {"message": "Successfully executed Swapland Agent to convert USDC to ETH!", "status": "swapcompleted","transaction": str(transac)}#data.get('payload')  # Extract the payload dictionary
-
-        uagent_address = DISPATCHER_AGENT #run the uagent.py copy the address and paste here
-        
-        # Build the Data Model digest for the Request model to ensure message format consistency between the uAgent and AI Agent
-        model_digest = Model.build_schema_digest(SwapCompleted)
-
-        # Send the payload to the specified agent
-        send_message_to_agent(
-            client_identity,  # Frontend client identity
-            uagent_address,  # Agent address where we have to send the data
-            payload,  # Payload containing the data
-            model_digest=model_digest
-        )
-
-        return jsonify({"status": "swapcompleted", "payload": payload})
-
-    except Exception as e:
-        logger.error(f"Error sending data to agent: {e}")
-        return jsonify({"error": str(e)}), 500
 
 
-def execute_swap(amount : float, private_key : str):
+
+async def execute_swap(ctx: Context, sender: str, msg: SwaplandRequest):
     # USDC contract for approval
     usdc_abi = '[{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"address","name":"minter_","type":"address"},{"internalType":"uint256","name":"mintingAllowedAfter_","type":"uint256"}],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"delegator","type":"address"},{"indexed":true,"internalType":"address","name":"fromDelegate","type":"address"},{"indexed":true,"internalType":"address","name":"toDelegate","type":"address"}],"name":"DelegateChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"delegate","type":"address"},{"indexed":false,"internalType":"uint256","name":"previousBalance","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"newBalance","type":"uint256"}],"name":"DelegateVotesChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"minter","type":"address"},{"indexed":false,"internalType":"address","name":"newMinter","type":"address"}],"name":"MinterChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Transfer","type":"event"},{"constant":true,"inputs":[],"name":"DELEGATION_TYPEHASH","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"DOMAIN_TYPEHASH","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"PERMIT_TYPEHASH","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"rawAmount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"uint32","name":"","type":"uint32"}],"name":"checkpoints","outputs":[{"internalType":"uint32","name":"fromBlock","type":"uint32"},{"internalType":"uint96","name":"votes","type":"uint96"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"delegatee","type":"address"}],"name":"delegate","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"delegatee","type":"address"},{"internalType":"uint256","name":"nonce","type":"uint256"},{"internalType":"uint256","name":"expiry","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"delegateBySig","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"delegates","outputs":[{"internalType":"address","name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"getCurrentVotes","outputs":[{"internalType":"uint96","name":"","type":"uint96"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"uint256","name":"blockNumber","type":"uint256"}],"name":"getPriorVotes","outputs":[{"internalType":"uint96","name":"","type":"uint96"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"minimumTimeBetweenMints","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"rawAmount","type":"uint256"}],"name":"mint","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"mintCap","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"minter","outputs":[{"internalType":"address","name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"mintingAllowedAfter","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"nonces","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"numCheckpoints","outputs":[{"internalType":"uint32","name":"","type":"uint32"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"rawAmount","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"permit","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"minter_","type":"address"}],"name":"setMinter","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"rawAmount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"internalType":"address","name":"src","type":"address"},{"internalType":"address","name":"dst","type":"address"},{"internalType":"uint256","name":"rawAmount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"}]'
 
@@ -184,7 +154,7 @@ def execute_swap(amount : float, private_key : str):
     rpc_endpoint = "https://mainnet.base.org"
 
     w3 = Web3(Web3.HTTPProvider(rpc_endpoint))
-    account = Account.from_key(private_key)
+    account = Account.from_key(msg.private_key)
 
     # Token addresses
     usdc_address = Web3.to_checksum_address('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913')  # USDC
@@ -211,7 +181,7 @@ def execute_swap(amount : float, private_key : str):
             "chainId": chain_id,
             "value": 0,
         })
-        signed_permit2_tx = w3.eth.account.sign_transaction(approve_permit2_tx, private_key)
+        signed_permit2_tx = w3.eth.account.sign_transaction(approve_permit2_tx, msg.private_key)
         try:
             permit2_tx_hash = w3.eth.send_raw_transaction(signed_permit2_tx.rawTransaction)
             print(f"Permit2 Approve Tx Hash: {w3.to_hex(permit2_tx_hash)}")
@@ -260,7 +230,7 @@ def execute_swap(amount : float, private_key : str):
 
     #amount = amount * 10**3 #adjust , convert it
     # Swap parameters
-    amount_in = int(amount * 10**6)  # 1 USDC 1 * 10**6 ,,, this should take .20 USDC
+    amount_in = int(msg.amount * 10**6)  # 1 USDC 1 * 10**6 ,,, this should take .20 USDC
     #amount_in = amount * 10**6 does not tolerate floats
     
     min_amount_out = 1 * 10**12  # 0.00001 ETH (18 decimals, ~$2.50 at $2,500/ETH)
@@ -277,7 +247,7 @@ def execute_swap(amount : float, private_key : str):
         "nonce": nonce,
         "chainId": chain_id
     })
-    signed_approve_tx = w3.eth.account.sign_transaction(approve_tx, private_key)
+    signed_approve_tx = w3.eth.account.sign_transaction(approve_tx, msg.private_key)
     approve_tx_hash = w3.eth.send_raw_transaction(signed_approve_tx.rawTransaction)
     print(f"Approval Tx Hash: {w3.to_hex(approve_tx_hash)}")
     w3.eth.wait_for_transaction_receipt(approve_tx_hash)
@@ -335,11 +305,9 @@ def execute_swap(amount : float, private_key : str):
     
     
     trxhash = "basescan.org/tx/"+str(w3.to_hex(trx_hash))
-    send_status(trxhash) #send status to main agent
+    rp = SwapCompleted(status = "success", message = "Successfully swapped ETH to USDC.", transaction = trxhash)
+    await ctx.send(USERINPUT_AGENT,rp)
 
 
-
-if __name__ == "__main__":
-    load_dotenv()       # Load environment variables
-    init_client()       #Register your agent on Agentverse
-    Thread(target=lambda: flask_app.run(host="0.0.0.0", port=5015, debug=True, use_reloader=False)).start()
+if __name__ == '__main__':
+    agent2.run()
