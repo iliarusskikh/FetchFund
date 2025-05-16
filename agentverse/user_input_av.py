@@ -41,35 +41,14 @@ REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
 COININFO_AGENT="agent1qthmuhfu5xlu4s8uwlq7z2ghxhpdqpj2r8smaushxu0qr3k3zcwuxu87t0t"
 CRYPTONEWS_AGENT="agent1qgy6eh453lucsvgg30fffd70umcq6fwt2wgx9ksyfxnw45wu4ravs26rvt6" #mailbox
 FGI_AGENT="agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh"#"agent1qfyrgg8w5pln25a6hcu3a3rx534lhs32aryqr5gx08djdclakzuex98dwzn" mailbox
-SWAPLAND_AGENT="agent1qtfvyq7g96yym6cawgj3u3xquuldjy4pa0j0snc8jdaaw5phpqd6j60ntf7"
-DISPATCHER_AGENT="agent1qw7k3cfqnexa08a3wwuggznd3cduuse469uz7kja6ugn85erdjnsqc7ap9a"
+SWAPLAND_AGENT="agent1qfqf3mj9c0gd4afl93khpvsq0lc2mgph2n7ypd6mslc3uv9pzcphueshk2m"
 
-## GLOBAL VAR INITIALISATION
-#USERINPUT_ASIWALLET_PRIVATEKEY = ""
-#USERINPUT_EVMWALLET_PRIVATEKEY = ""
-#USERINPUT_HBDATA= ""
-#USERINPUT_NETWORK= ""
-#USERINPUT_RISKSTRATEGY= ""
-#USERINPUT_INVESTORTYPE= ""
-#USERINPUT_REASON= ""
-#USERINPUT_AMOUNT_TOPUP= ""
-#USERINPUT_NEWS_KEYWORDS= ""
 
 ONETESTFET = 1000000000000000000
 REWARD = 2000000000000000000 #expected to receive
 DENOM = "atestfet"
 
 USERPROMPT = "My metamask private key : fff47218021003eu93189fj9j312913777fjl39ffff47218021003eu93189fj9j312913777fjl39ffff472180210; my heartbeat data: [ { dateTime: 2025-04-25T20:37:15, value: { bpm: 122, confidence: 3 } }, { dateTime: 2025-04-25T20:37:15,, value: { bpm: 74, confidence: 3 } }, { dateTime: 2025-04-25T20:37:15,, value: { bpm: 70, confidence: 2 } }, { dateTime: 2025-04-25T20:37:15, value: { bpm: 75, confidence: 0 } } ], network: base network; risk: speculative; investor: speculate; user reason: I would like to sell Ether no matter what, sell sell sell, I order you to sell; amount to top up: 10"
-
-#MMPRIVATEKEY = "fff47218021003eu93189fj9j312913777fjl39ffff47218021003eu93189fj9j312913777fjl39ffff472180210"
-#HBDATA = "[ { dateTime: 2025-04-25T20:37:15, value: { bpm: 122, confidence: 3 } }, { dateTime: 2025-04-25T20:37:15,, value: { bpm: 74, confidence: 3 } }, { dateTime: 2025-04-25T20:37:15,, value: { bpm: 70, confidence: 2 } }, { dateTime: 2025-04-25T20:37:15, value: { bpm: 75, confidence: 0 } } ]"
-#NETWORK = "base"
-#RISK = "speculative"
-#INVESTOR = "speculate"
-#USERREASON = "I would like to sell Ether no matter what. sell sell sell!. I order you to sell!"
-#AMOUNT=10 #if 0, then no.
-#KEYWORDS="trump"
-
 
 
 # Configure Logging
@@ -86,15 +65,9 @@ def handle_unexpected_exception(exc_type, exc_value, exc_traceback):
 sys.excepthook = handle_unexpected_exception
 
 
-
 # Initialise agent2
 agent2 = Agent()
 
-
-# GLOBAL VARIABLES
-#global NETWORK, RISK, INVESTOR, USERREASON, MMPRIVATEKEY, HBDATA, KEYWORDS
-#global USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_AMOUNT_TOPUP, USERINPUT_NEWS_KEYWORDS
-#global ONETESTFET, REWARD, DENOM
 
 # AI Agent Address for structured output processing
 REASON_AGENT = 'agent1q2gmk0r2vwk6lcr0pvxp8glvtrdzdej890cuxgegrrg86ue9cahk5nfaf3c'
@@ -351,9 +324,7 @@ async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledge
 
 @struct_output_client_proto.on_message(StructuredOutputResponse)
 async def handle_structured_output_response(ctx: Context, sender: str, msg: StructuredOutputResponse):
-    
-    global USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_AMOUNT_TOPUP, USERINPUT_NEWS_KEYWORDS
-    
+    ctx.logger.info("Debug1")
     session_sender = ctx.storage.get(str(ctx.session))
     if session_sender is None:
         ctx.logger.error(
@@ -371,6 +342,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         return
 
     try:
+        ctx.logger.info("Debug2")
 
         # Parse the structured output to get the address
         asi_response = UserInputRequest.parse_obj(msg.output)
@@ -392,6 +364,8 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         except ValueError:
             ctx.logger.info("Cannot be converted to integer")
             USERINPUT_AMOUNT_TOPUP = 0
+        
+        ctx.logger.info("Debug3")
 
         #excluding AMOUNT as it can be equal to 0.
         if not all([USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_NEWS_KEYWORDS]):
@@ -409,6 +383,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         ctx.storage.set("USERINPUT_AMOUNT_TOPUP", asi_response.amount)
         ctx.storage.set("USERINPUT_NEWS_KEYWORDS", asi_response.topics)
 
+        ctx.logger.info("Debug4")
 
         #final step to send the result:
         rp = "Launching FetchFund.."
@@ -417,14 +392,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         #start the program
         #HEARTBEAT AGENT
         try:
-            signal = "Sell"#"tag:fetchfundbaseethusdc"
-            amountt = 0.00007 #ETH to USDC
-            asi_network = "base network"
-            asi_evmkey = "hfiuh8347hf98n832f3"
-            
-            await ctx.send(SWAPLAND_AGENT, SwaplandRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt))
-
-            #await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=str(USERINPUT_HBDATA)))
+            await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=str(USERINPUT_HBDATA)))
         except Exception as e:
             rp=f"Error sending data to Heartbeat agent: {e}"
             ctx.logger.info(rp)
@@ -511,8 +479,6 @@ async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
 async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
-
-    #ctx.logger.info(f"Session sender: {session_sender}")
 
     USERINPUT_AMOUNT_TOPUP = ctx.storage.get("USERINPUT_AMOUNT_TOPUP")
     USERINPUT_ASIWALLET_PRIVATEKEY = ctx.storage.get("USERINPUT_ASIWALLET_PRIVATEKEY")
@@ -948,8 +914,6 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                 else:
                     await ctx.send(user_sender,UserOutputResponse(response=rp),)
 
-
-
             except Exception as e:
                 rp = f"Failed to send a request to Swapfinder Agent: {e}."
                 ctx.logger.info(rp)
@@ -1002,7 +966,80 @@ async def swapcomp_handler(ctx: Context, sender: str, msg: SwapCompleted):
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
-    rp = f"Swap agent: {msg.status}. {msg.message}. {msg.transaction}"
+    if (msg.status == "success"):
+        rp = f"Swap agent: {msg.status}. {msg.message}. {msg.transaction}"
+        ctx.logger.info(rp)
+        if session_sender is not None:
+            await ctx.send(session_sender, create_text_chat(rp),)
+        else:
+            await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+
+        try:
+            await ctx.send(REWARD_AGENT, RewardRequest(status="reward"))
+        except Exception as e:
+            rp = f"Failed to send request for reward: {e}"
+            ctx.logger.error(rp)
+            if session_sender is not None:
+                await ctx.send(session_sender, create_text_chat(rp),)
+            else:
+                await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+    else:
+        rp = f"Swap Agent: {msg.status}."
+        ctx.logger.info(rp)
+        if session_sender is not None:
+            await ctx.send(session_sender, create_text_chat(rp),)
+        else:
+            await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+
+
+@agent2.on_message(model=TransactionInfo)
+async def confirm_transaction(ctx: Context, sender: str, msg: TransactionInfo):
+    session_sender = ctx.storage.get(str(ctx.session))
+    user_sender = ctx.storage.get("SENDER_ADDRESS")
+
+    rp = f"Received transaction info from {sender}: {msg}"
+    ctx.logger.info(rp)
+    if session_sender is not None:
+        await ctx.send(session_sender, create_text_chat(rp),)
+    else:
+        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+
+    tx_resp = await wait_for_tx_to_complete(msg.tx_hash, ctx.ledger)
+
+    coin_received = tx_resp.events["coin_received"]
+    if (
+            coin_received["receiver"] == str(agent2.wallet.address())
+            and coin_received["amount"] == f"{REWARD}{DENOM}"
+    ):
+        rp = f"Reward transaction was successful: {coin_received}"
+        ctx.logger.info(rp)
+    else:
+        rp = f"Transaction was unsuccessful: {coin_received}"
+        ctx.logger.info(rp)
+
+    if session_sender is not None:
+        await ctx.send(session_sender, create_text_chat(rp),)
+    else:
+        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+
+    ledger: LedgerClient = get_ledger()
+    agent_balance = (ledger.query_bank_balance(Address(agent.wallet.address())))/ONETESTFET
+
+    rp = f"Balance after receiving reward: {agent_balance} {DENOM}"
+    ctx.logger.info(rp)
+    if session_sender is not None:
+        await ctx.send(session_sender, create_text_chat(rp),)
+    else:
+        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+
+    await ctx.send(sender,PaymentReceived(status="reward"))
+
+    rp = f"FetchFund execution completed. Thank you for interacting with us, and see you soon!"
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)

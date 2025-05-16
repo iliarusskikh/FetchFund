@@ -125,7 +125,7 @@ async def handle_message(ctx: Context, sender: str, msg: SwaplandRequest):
             
         
         logger.info(f"Called function execute_swap")
-        return jsonify({"status": "success"})
+        #return jsonify({"status": "success"})
 
     except Exception as e:
         rpl = f"Error in webhook: {e}"

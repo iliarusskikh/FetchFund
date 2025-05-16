@@ -1,4 +1,4 @@
-#agent1qt3vcc28ykzrnacsy5nj6k7c88c8r48esp6n25vc0cgtmzwl4m7jcaqvh8c
+#agent1qfqf3mj9c0gd4afl93khpvsq0lc2mgph2n7ypd6mslc3uv9pzcphueshk2m mailbox
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model, Field
 from uagents.experimental.quota import QuotaProtocol, RateLimit
@@ -182,8 +182,6 @@ async def handle_structured_output_response(
         am = swapland_request.amount
         pk = swapland_request.private_key
 
-
-
         if not (bl and sn and am and pk):
             await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid query for the swapland agent. Please, enter a matching SwaplandRequest schema, including blockchain name, signal, amount and a private key."),)
             return
@@ -260,8 +258,9 @@ async def search(ctx : Context, sender : str, msg: SwaplandRequest):
         agents = data.get("agents", [])
         logger.info("Formatted API Response:")
         
-        promptmsg= "Agents discovered..
-        "
+        promptmsg= '''Agents discovered..
+        
+        '''
         prompt = f'''        
         These are all agents found through the search agent function tagged as swapland.
         Each agent has 3 parameters to consider: name, address and readme. Evaluate them all.
@@ -279,7 +278,9 @@ async def search(ctx : Context, sender : str, msg: SwaplandRequest):
             Agent Name: {agent.get("name")}
             Agent Address: {agent.get("address")}
             Readme: {agent.get("readme")}
-            {"-" * 50}
+            
+            
+            
             '''
             
             prompt += tmp
@@ -295,18 +296,18 @@ async def search(ctx : Context, sender : str, msg: SwaplandRequest):
                 
         logger.info(f"Agent address discovered: {response}")
         
-        msg = f"Search engine has found the agent for swap: {response}."
-        rp = SwaplandResponse(status = msg)
+        rpl = f"Search engine has found the agent for swap: {response}."
+        rp = SwaplandResponse(status = rpl)
         await ctx.send(sender,rp)
         
         try:
-            pass
+            #pass
             #await call_swap(ctx, sender, msg, str(response)) # further execution!
-            #await ctx.send(agentaddress,msg)
+            await ctx.send(response,msg) #swap execution
         except Exception as e:
-            msg = f"Error calling for swap: {e}"
+            rpl = f"Error calling for swap: {e}"
             logger.error(msg)
-            rp = SwaplandResponse(status = msg)
+            rp = SwaplandResponse(status = rpl)
             await ctx.send(sender,rp)
             
         logger.info("Program completed")

@@ -663,11 +663,6 @@ async def message_handler(ctx: Context, sender: str, msg: SwaplandResponse):
 
 
 
-
-
-
-
-
 # Waits for completion of swapland agents. then executes request for reward from reward_agent
 @agent.on_message(model=SwapCompleted)
 async def message_handler(ctx: Context, sender: str, msg: SwapCompleted):
@@ -681,6 +676,8 @@ async def message_handler(ctx: Context, sender: str, msg: SwapCompleted):
     
     else:
         ctx.logger.info(f"Fail to execute swap via swapland: {msg.status}")
+        
+        
         
         
 #confirmation that reward has been received from reward_agent
