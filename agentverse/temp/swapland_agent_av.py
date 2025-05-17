@@ -1,4 +1,3 @@
-#agent1qtz52dgjs99jyuxd6qxajywnfjk4mvj0gy52zkstr7x0p8keet7a7dhejc9 agentverse
 #agent1qfqf3mj9c0gd4afl93khpvsq0lc2mgph2n7ypd6mslc3uv9pzcphueshk2m mailbox
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model, Field
@@ -14,6 +13,7 @@ import json
 from typing import Optional
 from datetime import datetime, timedelta
 from typing import Any
+from llm_swapfinder import query_llm
 
 
 # Import the necessary components of the chat protocol
@@ -25,6 +25,9 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     chat_protocol_spec,
 )
+
+load_dotenv()
+SWAPLAND_SEED = os.getenv("SWAPLAND_SEED")
 
 
 # Configure Logging
@@ -70,24 +73,14 @@ class StructuredOutputResponse(Model):
     output: dict[str, Any]
 
 
-class ContextPrompt(Model):
-    context: str
-    text: str
-
-class Response(Model):
-    text: str
-    
-
-
-
 # Initialize Agent
-agent2 = Agent()
-    #name="FetchFund - Swapland agent",
-    #port=8012,
-    #seed=SWAPLAND_SEED,
-    #mailbox = True,
+agent2 = Agent(
+    name="FetchFund - Swapland agent",
+    port=8012,
+    seed=SWAPLAND_SEED,
+    mailbox = True,
     #readme_path = "README_cryptonews.md",
-    #)
+    )
 
 # AI Agent Address for structured output processing
 AI_AGENT_ADDRESS = 'agent1q2gmk0r2vwk6lcr0pvxp8glvtrdzdej890cuxgegrrg86ue9cahk5nfaf3c'
@@ -110,7 +103,7 @@ struct_output_client_proto = Protocol(
 )
 proto = QuotaProtocol(
     storage_reference=agent2.storage,
-    name="FetchFund-Swapland-Protocol",
+    name="FetchFund-CryptoNews-Protocol",
     version="0.1.0",
     default_rate_limit=RateLimit(window_size_minutes=60, max_requests=10),
 )
@@ -162,7 +155,9 @@ async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledge
 
 
 @struct_output_client_proto.on_message(StructuredOutputResponse)
-async def handle_structured_output_response(ctx: Context, sender: str, msg: StructuredOutputResponse):
+async def handle_structured_output_response(
+    ctx: Context, sender: str, msg: StructuredOutputResponse
+):
     session_sender = ctx.storage.get(str(ctx.session))
     if session_sender is None:
         ctx.logger.error(
@@ -196,22 +191,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         #response_text= str(get_recent_crypto_news(cryptonews_request.keywords))
         #search("Sell", "2177jhbekh271giuf3", "base", 0.0005) # test
 
-        ctx.storage.set("AMOUNT_TO_SWAP", am)
-        ctx.storage.set("PRIVATE_KEY", pk)
-        ctx.storage.set("SIGNAL", sn)
-        ctx.storage.set("NETWORK", bl)
-        ctx.storage.set("SENDER", sender)
-
-        ctx.logger.info(f"Processed response: {msg}")
-        
-        #rp = SwaplandResponse(status = "Request to Swapland Agent sent.")
-        #await ctx.send(sender,rp)
-        
-        await search(ctx,sender,SwaplandRequest(blockchain = bl, signal = sn, amount = am, private_key = pk)) #swap) #debug to be enabled
-
-
-
-        #await ctx.send(session_sender, create_text_chat(response_text))
+        await ctx.send(session_sender, create_text_chat(response_text))
         
     except Exception as err:
         ctx.logger.error(err)
@@ -224,6 +204,12 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         return
 
 
+
+#USERINPUT_ADDRESS="agent1q2aczah05l97w8mnen2lcc59y052w8mphzwgv0q37npm9fml2fz5sw2s4vz"
+#DISPATCHER_ADDRESS="agent1qw7k3cfqnexa08a3wwuggznd3cduuse469uz7kja6ugn85erdjnsqc7ap9a"
+
+
+
 @proto.on_message(model=SwaplandRequest)
 async def handle_message(ctx: Context, sender: str, msg: SwaplandRequest):
     """Handle incoming messages"""
@@ -233,13 +219,7 @@ async def handle_message(ctx: Context, sender: str, msg: SwaplandRequest):
         signal = msg.signal
         network = msg.blockchain
         
-        ctx.storage.set("AMOUNT_TO_SWAP", amount_to_swap)
-        ctx.storage.set("PRIVATE_KEY", private_key)
-        ctx.storage.set("SIGNAL", signal)
-        ctx.storage.set("NETWORK", network)
-        ctx.storage.set("SENDER", sender)
-
-        ctx.logger.info(f"Processed response: {msg}")
+        logger.info(f"Processed response: {msg}")
         
         #rp = SwaplandResponse(status = "Request to Swapland Agent sent.")
         #await ctx.send(sender,rp)
@@ -248,7 +228,7 @@ async def handle_message(ctx: Context, sender: str, msg: SwaplandRequest):
     
     except Exception as e:
         txt=f"Error when processing the request: {e}"
-        ctx.logger.error(txt)
+        logger.error(txt)
         rp = SwaplandResponse(status = txt)
         await ctx.send(sender,rp)
 
@@ -256,7 +236,7 @@ async def handle_message(ctx: Context, sender: str, msg: SwaplandRequest):
 async def search(ctx : Context, sender : str, msg: SwaplandRequest):
     # Search for agents matching the query
     # API endpoint and payload
-    ctx.logger.info(f"Received signal: {msg.signal}")
+    logger.info(f"Received signal: {msg.signal}")
 
     api_url = "https://agentverse.ai/v1/search/agents"
     query = "tag:fetchfundswapland"
@@ -276,23 +256,33 @@ async def search(ctx : Context, sender : str, msg: SwaplandRequest):
         # Parse the JSON response
         data = discovery.json()
         agents = data.get("agents", [])
-        ctx.logger.info("Formatted API Response:")
+        logger.info("Formatted API Response:")
         
-        promptmsg= "Agents discovered.. "
-        promptmsg+= "                            "
-
-        conte = f"These are all agents found through the search agent function tagged as swapland. Each agent has 3 parameters to consider: name, address and readme. Evaluate them all.You are looking for an agent that would execute a {msg.signal} signal on {msg.blockchain} network. Your response should be formatted as an agent address only, which can be found under the agent name."
-        prompt = "                        "
-        ctx.logger.info("Agents discovered.. ")
-        for agentvar in agents:
-            ctx.logger.info("-" * 100)
-            tmp= "                                                "
-            tmp += f'''Agent Name: {agentvar.get("name")}. '''
-            tmp+= f'''Agent Address: {agentvar.get("address")}. '''
-            tmp+= f'''Readme: {agentvar.get("readme")}. '''
-            tmp+= "                                     "
-            ctx.logger.info(tmp)
-
+        promptmsg= '''Agents discovered..
+        
+        '''
+        prompt = f'''        
+        These are all agents found through the search agent function tagged as swapland.
+        Each agent has 3 parameters to consider: name, address and readme. Evaluate them all.
+        You are looking for an agent that would execute a {msg.signal} signal on {msg.blockchain} network.
+        Your response should be formatted as an agent address only, which can be found under the agent name.
+        '''
+        logger.info("Agents discovered..")
+        for agent in agents:
+            print("-" * 100)
+            print("Agent Name:", agent.get("name"))
+            print("Agent Address:", agent.get("address"))
+            print("Readme:", agent.get("readme"))
+            
+            tmp = f'''
+            Agent Name: {agent.get("name")}
+            Agent Address: {agent.get("address")}
+            Readme: {agent.get("readme")}
+            
+            
+            
+            '''
+            
             prompt += tmp
             promptmsg += tmp
         
@@ -300,43 +290,31 @@ async def search(ctx : Context, sender : str, msg: SwaplandRequest):
         rp = SwaplandResponse(status = str(promptmsg))
         await ctx.send(sender,rp)
             
-        ctx.logger.info("Request sent to ASI1 model to evaluate the list of discovered agents..")
-        await ctx.send(AI_AGENT_ADDRESS, ContextPrompt(context=conte, text = prompt))
-
-        #response = query_llm(prompt)  # Query the AI for a decision
-    else:
-        ctx.logger.info(f"Request failed with status code {response.status_code}")
-
-    #return {"status": "Agent searched"}
-
-
-@agent2.on_message(model=Response)
-async def handle_message(ctx: Context, sender: str, msg: Response):
-    am = ctx.storage.get("AMOUNT_TO_SWAP")
-    pk = ctx.storage.get("PRIVATE_KEY")
-    sg = ctx.storage.get("SIGNAL")
-    nk = ctx.storage.get("NETWORK")
-    sdr = ctx.storage.get("SENDER")
-
-    
-    rpl = f"Search engine has found the agent for swap: {msg.text}."
-    ctx.logger.info(rpl)
-    rp = SwaplandResponse(status = rpl)
-    await ctx.send(sdr,rp)
-    
-    try:
-        pass
-        #await call_swap(ctx, sender, msg, str(response)) # further execution!
-        await ctx.send(msg.text,SwaplandRequest(blockchain = nk, signal = sg, amount = am, private_key = pk)) #swap
-
-    except Exception as e:
-        rpl = f"Error calling for swap: {e}"
-        ctx.logger.error(rpl)
-        rp = SwaplandResponse(status = rpl)
-        await ctx.send(sdr,rp)
+        logger.info("Request sent to ASI1 model to evaluate the list of discovered agents..")
         
-    ctx.logger.info("Program completed")
+        response = query_llm(prompt)  # Query the AI for a decision
+                
+        logger.info(f"Agent address discovered: {response}")
+        
+        rpl = f"Search engine has found the agent for swap: {response}."
+        rp = SwaplandResponse(status = rpl)
+        await ctx.send(sender,rp)
+        
+        try:
+            #pass
+            #await call_swap(ctx, sender, msg, str(response)) # further execution!
+            await ctx.send(response,msg) #swap execution
+        except Exception as e:
+            rpl = f"Error calling for swap: {e}"
+            logger.error(msg)
+            rp = SwaplandResponse(status = rpl)
+            await ctx.send(sender,rp)
+            
+        logger.info("Program completed")
+    else:
+        logger.info(f"Request failed with status code {response.status_code}")
 
+    return {"status": "Agent searched"}
 
 
 
