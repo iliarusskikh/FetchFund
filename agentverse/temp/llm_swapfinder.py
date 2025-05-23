@@ -29,11 +29,28 @@ def query_llm(query):
     
     If an error occurs during the request, the function returns the exception object.
     """
+    # Initial message setup
+    initial_message = [
+        {
+            "role": "system",
+            "content": "You are a weather assistant. When a user asks for the weather in a location, use the get_weather tool with the appropriate latitude and longitude for that location."
+        },
+        {
+            "role": "user",
+            "content": "What's the current weather like in New York right now?"
+        }
+    ]
+    
     data = {
         "messages": [{"role": "user", "content": query}],  # User input for the chat model
         "conversationId": None,  # No conversation history tracking
-        "model": "asi1-mini"  # Specifies the model version to use
+        "model": "asi1-mini",  # Specifies the model version to use
+        "stream": false,
+        "temperature":0.7,
+        "max_tokens": 2000
+    
     }
+    
 
     try:
         # Send a POST request to the LLM API with the input query

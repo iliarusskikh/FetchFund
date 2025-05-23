@@ -11,6 +11,8 @@ from cosmpy.crypto.address import Address
 from uagents.network import get_faucet, get_ledger
 from uagents.agent import AgentRepresentation #to use txn wallet
 from uagents.config import TESTNET_REGISTRATION_FEE
+from uagents.network import wait_for_tx_to_complete
+
 
 from cosmpy.aerial.config import NetworkConfig
 from cosmpy.aerial.wallet import LocalWallet
@@ -41,7 +43,7 @@ REWARD_AGENT="agent1qgywfpwj62l0jkwtwrqly8f3mz5j7qhxhz74ngf2h8pmagu3k282scgzpmj"
 COININFO_AGENT="agent1qthmuhfu5xlu4s8uwlq7z2ghxhpdqpj2r8smaushxu0qr3k3zcwuxu87t0t"
 CRYPTONEWS_AGENT="agent1qgy6eh453lucsvgg30fffd70umcq6fwt2wgx9ksyfxnw45wu4ravs26rvt6" #mailbox
 FGI_AGENT="agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh"#"agent1qfyrgg8w5pln25a6hcu3a3rx534lhs32aryqr5gx08djdclakzuex98dwzn" mailbox
-SWAPLAND_AGENT="agent1qfqf3mj9c0gd4afl93khpvsq0lc2mgph2n7ypd6mslc3uv9pzcphueshk2m"
+SWAPLAND_AGENT="agent1qtz52dgjs99jyuxd6qxajywnfjk4mvj0gy52zkstr7x0p8keet7a7dhejc9"#agent1qfqf3mj9c0gd4afl93khpvsq0lc2mgph2n7ypd6mslc3uv9pzcphueshk2m"
 
 
 ONETESTFET = 1000000000000000000
@@ -131,7 +133,7 @@ class UserInputRequest(Model):
     privatekey2: str = Field(
         description="EVM wallet private key provided by user.",
     )
-    hbdata: str = Field(
+    hbdata: dict[str, Any] = Field(
         description="heartbeat data sent by user",
     )
     network: str = Field(
@@ -146,7 +148,7 @@ class UserInputRequest(Model):
     userreason: str = Field(
         description="Some additional comments and suggestions provided by user",
     )
-    amount: int = Field(
+    amount: str = Field(
         description="Amount of test fet to top-up user wallet with.",
     )
     topics: str = Field(
@@ -164,7 +166,7 @@ class UserOutputResponse(Model):
 
 ### HEARTBEAT AGENT ###
 class HeartbeatRequest(Model):
-    hbdata: str = Field(
+    hbdata: dict[str,Any] = Field(
         description="heartbeat data sent by user",
     )
 
@@ -206,9 +208,13 @@ class PaymentReceived(Model):
     status: str
     
 class RewardRequest(Model):
+    wallet_address: str = Field(
+        description="wallet to receive the reward",
+    )
     status: str = Field(
         description="user requesting reward",
     )
+ 
     
 ### COININFO AGENT ###
 class CoinInfoResponse(Model):
@@ -343,10 +349,11 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
 
     try:
         ctx.logger.info("Debug2")
-
+        ctx.logger.info(f"{msg.output}")
         # Parse the structured output to get the address
         asi_response = UserInputRequest.parse_obj(msg.output)
-        
+        ctx.logger.info(f"Debug3")
+
         USERINPUT_ASIWALLET_PRIVATEKEY = asi_response.privatekey1
         USERINPUT_EVMWALLET_PRIVATEKEY = asi_response.privatekey2
         USERINPUT_HBDATA = asi_response.hbdata
@@ -356,7 +363,8 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         USERINPUT_REASON = asi_response.userreason
         USERINPUT_AMOUNT_TOPUP = asi_response.amount
         USERINPUT_NEWS_KEYWORDS=asi_response.topics
-
+        
+        ctx.logger.info("Debug4")
         #make sure amount is set to a value
         try:
             int(USERINPUT_AMOUNT_TOPUP)
@@ -365,7 +373,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
             ctx.logger.info("Cannot be converted to integer")
             USERINPUT_AMOUNT_TOPUP = 0
         
-        ctx.logger.info("Debug3")
+        ctx.logger.info("Debug5")
 
         #excluding AMOUNT as it can be equal to 0.
         if not all([USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_NEWS_KEYWORDS]):
@@ -373,15 +381,15 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
            return
 
         #store the values
-        ctx.storage.set("USERINPUT_ASIWALLET_PRIVATEKEY", asi_response.privatekey1)
-        ctx.storage.set("USERINPUT_EVMWALLET_PRIVATEKEY", asi_response.privatekey2)
+        ctx.storage.set("USERINPUT_ASIWALLET_PRIVATEKEY", USERINPUT_ASIWALLET_PRIVATEKEY)
+        ctx.storage.set("USERINPUT_EVMWALLET_PRIVATEKEY", USERINPUT_EVMWALLET_PRIVATEKEY)
         #ctx.storage.set("USERINPUT_HBDATA", asi_response.hbdata)
-        ctx.storage.set("USERINPUT_NETWORK", asi_response.network)
-        ctx.storage.set("USERINPUT_RISKSTRATEGY", asi_response.riskstrategy)
-        ctx.storage.set("USERINPUT_INVESTORTYPE", asi_response.investortype)
-        ctx.storage.set("USERINPUT_REASON", asi_response.userreason)
-        ctx.storage.set("USERINPUT_AMOUNT_TOPUP", asi_response.amount)
-        ctx.storage.set("USERINPUT_NEWS_KEYWORDS", asi_response.topics)
+        ctx.storage.set("USERINPUT_NETWORK", USERINPUT_NETWORK)
+        ctx.storage.set("USERINPUT_RISKSTRATEGY", USERINPUT_RISKSTRATEGY)
+        ctx.storage.set("USERINPUT_INVESTORTYPE", USERINPUT_INVESTORTYPE)
+        ctx.storage.set("USERINPUT_REASON", USERINPUT_REASON)
+        ctx.storage.set("USERINPUT_AMOUNT_TOPUP", USERINPUT_AMOUNT_TOPUP)
+        ctx.storage.set("USERINPUT_NEWS_KEYWORDS", USERINPUT_NEWS_KEYWORDS)
 
         ctx.logger.info("Debug4")
 
@@ -389,10 +397,18 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         rp = "Launching FetchFund.."
         await ctx.send(session_sender, create_text_chat(rp),)
 
-        #start the program
+
         #HEARTBEAT AGENT
         try:
-            await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=str(USERINPUT_HBDATA)))
+            ### TEST DEBUG
+            #signal = "Buy"#"tag:fetchfundbaseethusdc"
+            #amountt = 0.1 #USDC to ETH
+            #asi_evmkey = EVM_PRIVATE_KEY
+            #asi_network = "base network"
+            #await ctx.send(SWAPLAND_AGENT, SwaplandRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt))
+            ###
+            
+            await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=USERINPUT_HBDATA))
         except Exception as e:
             rp=f"Error sending data to Heartbeat agent: {e}"
             ctx.logger.info(rp)
@@ -551,7 +567,9 @@ async def response_funds(ctx: Context, sender: str, msg: TopupResponse):
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
     
-    rp = f"Topup Agent: funds have been received successfully: {msg.status}"
+    USERINPUT_AMOUNT_TOPUP = ctx.storage.get("USERINPUT_AMOUNT_TOPUP")
+
+    rp = f"Topup Agent: funds have been received successfully: {msg.status}. Received {USERINPUT_AMOUNT_TOPUP}."
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)
@@ -559,15 +577,17 @@ async def response_funds(ctx: Context, sender: str, msg: TopupResponse):
         await ctx.send(user_sender,UserOutputResponse(response=rp),)
         
     #execute reward_agent to pay fees for using swapland service. this might not be async though
-    ledger: LedgerClient = get_ledger()
-    agent_balance = ledger.query_bank_balance(Address(agent2.wallet.address()))/ONETESTFET
+    #not enough time for balance to be updated
+    #ledger: LedgerClient = get_ledger()
+    #agent_balance = ledger.query_bank_balance(Address(agent2.wallet.address()))/ONETESTFET
     
-    rp = f"Balance after topup wallet: {agent_balance} TESTFET"
-    ctx.logger.info(rp)
-    if session_sender is not None:
-        await ctx.send(session_sender, create_text_chat(rp),)
-    else:
-        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+    #rp = "Wallet has been topped up with "
+    #rp = f"Balance after topup wallet: {agent_balance} TESTFET"
+    #ctx.logger.info(rp)
+    #if session_sender is not None:
+    #    await ctx.send(session_sender, create_text_chat(rp),)
+    #else:
+    #    await ctx.send(user_sender,UserOutputResponse(response=rp),)
 
     try:
         await ctx.send(REWARD_AGENT, PaymentInquiry(status = "ready"))
@@ -608,6 +628,14 @@ async def message_handler(ctx: Context, sender: str, msg: PaymentRequest):
     agent_balance = ledger.query_bank_balance(Address(agent2.wallet.address()))/ONETESTFET
     #instead i need to check here if the user agent has enough funds. if not, then return error, and finish the execution!
     
+    rp = f"Current balance is: {agent_balance} {DENOM}"
+    ctx.logger.info(rp)
+    if session_sender is not None:
+        await ctx.send(session_sender, create_text_chat(rp),)
+    else:
+        await ctx.send(user_sender,UserOutputResponse(response=rp),)
+    
+
     if (agent_balance > fees):
         transaction = ctx.ledger.send_tokens(msg.wallet_address, msg.amount, msg.denom,agent2.wallet)
         rp = f"Transaction of {fees} has been sent: {transaction}."
@@ -931,8 +959,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                 await ctx.send(user_sender,UserOutputResponse(response=rp),)
             
             try:
-                pass
-                #await ctx.send(REWARD_AGENT, RewardRequest(status="reward"))
+                await ctx.send(REWARD_AGENT, RewardRequest(wallet_address =str(agent2.wallet.address()),status="reward"))
             except Exception as e:
                 ctx.logger.error(f"Failed to send request for reward: {e}.")
         else:
@@ -976,7 +1003,7 @@ async def swapcomp_handler(ctx: Context, sender: str, msg: SwapCompleted):
 
 
         try:
-            await ctx.send(REWARD_AGENT, RewardRequest(status="reward"))
+            await ctx.send(REWARD_AGENT, RewardRequest(wallet_address=str(agent2.wallet.address()),status="reward"))
         except Exception as e:
             rp = f"Failed to send request for reward: {e}"
             ctx.logger.error(rp)
