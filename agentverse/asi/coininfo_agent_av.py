@@ -48,11 +48,11 @@ proto = QuotaProtocol(
     storage_reference=agent2.storage,
     name="FethcFund-CoinInfo-Protocol",
     version="0.1.0",
-    default_rate_limit=RateLimit(window_size_minutes=60, max_requests=10),
+    default_rate_limit=RateLimit(window_size_minutes=60, max_requests=15),
 )
 
 
-class CoinResponse(Model):
+class CoinInfoResponse(Model):
     name: str
     symbol: str
     current_price: float
@@ -61,7 +61,7 @@ class CoinResponse(Model):
     price_change_24h: float
 
 
-class BlockchainRequest(Model):
+class CoinInfoRequest(Model):
     blockchain: str = Field(
         description="Blockchain or crypto network name to check the price of its native coin",
     )
@@ -73,13 +73,13 @@ class StructuredOutputPrompt(Model):
 class StructuredOutputResponse(Model):
     output: dict[str, Any]
 
-def get_crypto_info(blockchain: str) -> CoinResponse:
+def get_crypto_info(blockchain: str) -> CoinInfoResponse:
     match blockchain:
-        case "ethereum"|"Ethereum"|"Ethereum network"|"ETH"|"eth":
+        case "ethereum"|"Ethereum"|"Ethereum network"|"ETH"|"eth"|"ethereum network":
             coin_id = "ethereum"
-        case "base"| "Base" | "Base network"|"Base blockchain":
+        case "base"| "Base" | "Base network"|"Base blockchain"| "base network"|"base blockchain":
             coin_id = "ethereum"
-        case "solana"|"Solana"|"SOL":
+        case "solana"|"Solana"|"SOL"|"solana blockchain"|"solana network":
             coin_id = "solana"
         case "bsc"|"Bsc"| "Bsc network"|"BNB":
             coin_id = "binancecoin"
@@ -112,7 +112,7 @@ def get_crypto_info(blockchain: str) -> CoinResponse:
 
         data = response.json()
         
-        return CoinResponse(
+        return CoinInfoResponse(
             name=data['name'],
             symbol=data['symbol'].upper(),
             current_price=data['market_data']['current_price']['usd'],
@@ -123,7 +123,7 @@ def get_crypto_info(blockchain: str) -> CoinResponse:
     
     except requests.exceptions.RequestException as e:
         logging.error(f"⚠️ API Request Failed: {e}")
-        return CoinResponse(
+        return CoinInfoResponse(
             name="Unknown",
             symbol="N/A",
             current_price=0.0,
@@ -162,7 +162,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             await ctx.send(
                 AI_AGENT_ADDRESS,
                 StructuredOutputPrompt(
-                    prompt=item.text, output_schema=BlockchainRequest.schema()
+                    prompt=item.text, output_schema=CoinInfoRequest.schema()
                 ),
             )
         else:
@@ -200,7 +200,7 @@ async def handle_structured_output_response(
 
     try:
         # Parse the structured output to get the address
-       blockchain_request = BlockchainRequest.parse_obj(msg.output)
+       blockchain_request = CoinInfoRequest.parse_obj(msg.output)
        block = blockchain_request.blockchain
         
        if not block:
@@ -223,7 +223,7 @@ async def handle_structured_output_response(
 
 
 #agents interactions
-async def process_response(ctx: Context, msg: BlockchainRequest) -> CoinResponse:
+async def process_response(ctx: Context, msg: CoinInfoRequest) -> CoinInfoResponse:
     """Process the crypto request and return formatted response"""
     agent2._logger.info(f"🔄 Fetching crypto data for: {msg.blockchain}")
 
@@ -232,8 +232,8 @@ async def process_response(ctx: Context, msg: BlockchainRequest) -> CoinResponse
     return crypto_data
 
 
-@proto.on_message(model=BlockchainRequest)
-async def handle_message(ctx: Context, sender: str, msg: BlockchainRequest):
+@proto.on_message(model=CoinInfoRequest)
+async def handle_message(ctx: Context, sender: str, msg: CoinInfoRequest):
     """Handle incoming messages requesting crypto information"""
     agent2._logger.info(f"📩 Received message from {sender}: {msg.blockchain}")
     

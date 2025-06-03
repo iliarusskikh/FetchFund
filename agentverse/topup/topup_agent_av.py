@@ -50,18 +50,18 @@ class StructuredOutputResponse(Model):
 
 class TopupRequest(Model):
     amount: float = Field(
-        description="Amount fo test fet to top up agent wallet address",
+        description="Requested amount of FET",
     )
     agentwallet: str = Field(
-        description="agent wallet address",
+        description="Recepient wallet address",
     )
     fetwallet: str = Field(
-        description="ASI FET wallet address",
+        description="User's ASI wallet to send the funds from",
     )
 
 class TopupResponse(Model):
     status: str = Field(
-        description="success completion status",
+        description="Successful completion status",
     )
  
 class TopupResponseChat(Model):
@@ -173,7 +173,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         await ctx.send(
             session_sender,
             create_text_chat(
-                "Sorry, I couldn't process your request. Please include a valid prompt text to match TopupRequest(Model)."
+                "Sorry, I couldn't process your request. Please, include a valid prompt text to match TopupRequest(Model). Provide the following parameters: amount, agent wallet, asi fet wallet."
             ),
         )
         return

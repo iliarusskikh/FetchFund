@@ -127,8 +127,11 @@ class Response(Model):
 
 ### USER INPUT CLASSES###
 class UserInputRequest(Model):
-    privatekey1: str = Field(
-        description="ASI wallet private key provided by user.",
+    #useragent: str = Field(
+    #    description="User agent address provided by user.",
+    #)
+    fetwallet: str = Field(
+        description="ASI wallet address provided by user.",
     )
     privatekey2: str = Field(
         description="EVM wallet private key provided by user.",
@@ -354,7 +357,8 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         asi_response = UserInputRequest.parse_obj(msg.output)
         ctx.logger.info(f"Debug3")
 
-        USERINPUT_ASIWALLET_PRIVATEKEY = asi_response.privatekey1
+        #USERINPUT_USERAGENT_ADDRESS = asi_response.useragent
+        USERINPUT_ASIWALLET_ADDRESS = asi_response.fetwallet
         USERINPUT_EVMWALLET_PRIVATEKEY = asi_response.privatekey2
         USERINPUT_HBDATA = asi_response.hbdata
         USERINPUT_NETWORK = asi_response.network
@@ -376,12 +380,14 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         ctx.logger.info("Debug5")
 
         #excluding AMOUNT as it can be equal to 0.
-        if not all([USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_NEWS_KEYWORDS]):
+        if not all([USERINPUT_ASIWALLET_ADDRESS, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_NEWS_KEYWORDS]):
            await ctx.send(session_sender,create_text_chat("Sorry, I couldn't find a valid user input data in your query."),)
            return
 
         #store the values
-        ctx.storage.set("USERINPUT_ASIWALLET_PRIVATEKEY", USERINPUT_ASIWALLET_PRIVATEKEY)
+        
+        #ctx.storage.set("USERINPUT_USERAGENT_ADDRESS", USERINPUT_USERAGENT_ADDRESS)
+        ctx.storage.set("USERINPUT_ASIWALLET_ADDRESS", USERINPUT_ASIWALLET_ADDRESS)
         ctx.storage.set("USERINPUT_EVMWALLET_PRIVATEKEY", USERINPUT_EVMWALLET_PRIVATEKEY)
         #ctx.storage.set("USERINPUT_HBDATA", asi_response.hbdata)
         ctx.storage.set("USERINPUT_NETWORK", USERINPUT_NETWORK)
@@ -394,7 +400,7 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
         ctx.logger.info("Debug4")
 
         #final step to send the result:
-        rp = "Launching FetchFund.."
+        rp = "Welcome to FetchFund! The system has been initialised.."
         await ctx.send(session_sender, create_text_chat(rp),)
 
 
@@ -409,6 +415,9 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
             ###
             
             await ctx.send(HEARTBEAT_AGENT,HeartbeatRequest(hbdata=USERINPUT_HBDATA))
+            rp = "Request to Heartbeat agent sent."
+            ctx.logger.info(rp)
+            await ctx.send(session_sender, create_text_chat(rp),)
         except Exception as e:
             rp=f"Error sending data to Heartbeat agent: {e}"
             ctx.logger.info(rp)
@@ -431,10 +440,11 @@ async def handle_structured_output_response(ctx: Context, sender: str, msg: Stru
 async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
     ctx.logger.info(f"User input data received: {msg}")
 
-    global USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_AMOUNT_TOPUP, USERINPUT_NEWS_KEYWORDS
+    #global USERINPUT_ASIWALLET_ADDRESS, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_AMOUNT_TOPUP, USERINPUT_NEWS_KEYWORDS
 
     try:
-        USERINPUT_ASIWALLET_PRIVATEKEY = msg.privatekey1
+        #USERINPUT_USERAGENT_ADDRESS = asi_response.useragent
+        USERINPUT_ASIWALLET_ADDRESS = msg.fetwallet
         USERINPUT_EVMWALLET_PRIVATEKEY = msg.privatekey2
         USERINPUT_HBDATA = msg.hbdata
         USERINPUT_NETWORK = msg.network
@@ -456,14 +466,15 @@ async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
         ctx.logger.info("Cannot be converted to integer.")
         USERINPUT_AMOUNT_TOPUP = 0
     
-    if not all([USERINPUT_ASIWALLET_PRIVATEKEY, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_NEWS_KEYWORDS]):
+    if not all([USERINPUT_ASIWALLET_ADDRESS, USERINPUT_EVMWALLET_PRIVATEKEY, USERINPUT_HBDATA, USERINPUT_NETWORK, USERINPUT_RISKSTRATEGY, USERINPUT_INVESTORTYPE, USERINPUT_REASON, USERINPUT_NEWS_KEYWORDS]):
         await ctx.send(sender,UserOutputResponse(response="Sorry, I couldn't find a valid user input data in your query."),)
         return
 
     #store the values
     ctx.storage.set("SENDER_ADDRESS", sender)
 
-    ctx.storage.set("USERINPUT_ASIWALLET_PRIVATEKEY", msg.privatekey1)
+    #ctx.storage.set("USERINPUT_USERAGENT_ADDRESS", msg.useragent)
+    ctx.storage.set("USERINPUT_ASIWALLET_ADDRESS", msg.fetwallet)
     ctx.storage.set("USERINPUT_EVMWALLET_PRIVATEKEY", msg.privatekey2)
     #ctx.storage.set("USERINPUT_HBDATA"), msg.hbdata)
     ctx.storage.set("USERINPUT_NETWORK", msg.network)
@@ -473,7 +484,8 @@ async def handle_request(ctx: Context, sender: str, msg: UserInputRequest):
     ctx.storage.set("USERINPUT_AMOUNT_TOPUP", msg.amount)
     ctx.storage.set("USERINPUT_NEWS_KEYWORDS", msg.topics)
 
-    await ctx.send(sender,UserOutputResponse(response="Launching FetchFund.."),)
+    rp = "Welcome to FetchFund! The system has been initialised.."
+    await ctx.send(sender,UserOutputResponse(response=rp),)
 
 
     # HEARTBEAT AGENT
@@ -497,7 +509,7 @@ async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
     USERINPUT_AMOUNT_TOPUP = ctx.storage.get("USERINPUT_AMOUNT_TOPUP")
-    USERINPUT_ASIWALLET_PRIVATEKEY = ctx.storage.get("USERINPUT_ASIWALLET_PRIVATEKEY")
+    USERINPUT_ASIWALLET_ADDRESS = ctx.storage.get("USERINPUT_ASIWALLET_ADDRESS")
 
     if (msg.status == "continue"):
         rp = f"Heartbeat agent: Received response - {msg.status}. Let's trade!"
@@ -513,8 +525,8 @@ async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
         if (int(USERINPUT_AMOUNT_TOPUP) > 0):#if 0 then top up not required
             agwall= (str)(agent2.wallet.address())
             try:
-                await ctx.send(TOPUP_AGENT, TopupRequest(amount=USERINPUT_AMOUNT_TOPUP, agentwallet=agwall, fetwallet=USERINPUT_ASIWALLET_PRIVATEKEY))
-                rp = f"Request to Topup Agent for receiving funds sent.."
+                await ctx.send(TOPUP_AGENT, TopupRequest(amount=USERINPUT_AMOUNT_TOPUP, agentwallet=agwall, fetwallet=USERINPUT_ASIWALLET_ADDRESS))
+                rp = f"Request to Topup Agent sent.."
                 ctx.logger.info(rp)
                 if session_sender is not None:
                     await ctx.send(session_sender, create_text_chat(rp),)
@@ -533,7 +545,7 @@ async def message_handler(ctx: Context, sender: str, msg: HeartbeatResponse):
             #execute reward_agent to pay fees for using swapland service. this might not be async though
             try:
                 await ctx.send(REWARD_AGENT, PaymentInquiry(status = "ready"))
-                rp = f"Request to Reward Agent for making a payment sent."
+                rp = f"Request to Reward Agent to make a payment sent."
                 ctx.logger.info(rp)
                 if session_sender is not None:
                     await ctx.send(session_sender, create_text_chat(rp),)
@@ -569,7 +581,7 @@ async def response_funds(ctx: Context, sender: str, msg: TopupResponse):
     
     USERINPUT_AMOUNT_TOPUP = ctx.storage.get("USERINPUT_AMOUNT_TOPUP")
 
-    rp = f"Topup Agent: funds have been received successfully: {msg.status}. Received {USERINPUT_AMOUNT_TOPUP}."
+    rp = f"Topup Agent: Received response - {msg.status}. Received {USERINPUT_AMOUNT_TOPUP} {DENOM}."
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)
@@ -599,7 +611,7 @@ async def response_funds(ctx: Context, sender: str, msg: TopupResponse):
             await ctx.send(user_sender,UserOutputResponse(response=rp),)
 
     except Exception as e:
-        rp = f"Failed to send request Reward Agent to pay fees for using swapland services: {e}"
+        rp = f"Failed to send request Reward Agent to pay fees for using FetchFund services: {e}"
         ctx.logger.info(rp)
         if session_sender is not None:
             await ctx.send(session_sender, create_text_chat(rp),)
@@ -614,7 +626,9 @@ async def message_handler(ctx: Context, sender: str, msg: PaymentRequest):
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
-    rp = f"Payment request received: {msg}"
+    #should send it from here to user to get paid from their wallet
+
+    rp = f"Reward Agent: Payment request received - {msg}"
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)
@@ -663,7 +677,7 @@ async def message_handler(ctx: Context, sender: str, msg: PaymentReceived):
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
     if (msg.status == "success"):
-        rp = f"Fees transaction successful!"
+        rp = f"Reward Agent: Fees transaction successful!"
         ctx.logger.info(rp)
         if session_sender is not None:
             await ctx.send(session_sender, create_text_chat(rp),)
@@ -716,7 +730,7 @@ async def coininfo_response(ctx: Context, sender: str, msg: CoinInfoResponse):
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
-    rp = f"CoinInfo Agent response: {msg}."
+    rp = f"CoinInfo Agent: Response received - {msg}."
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)
@@ -753,7 +767,7 @@ async def handle_cryptonews_response(ctx: Context, sender: str, msg: CryptonewsR
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
-    rp = f"Cryptonews Agent response: {msg}."
+    rp = f"Cryptonews Agent: Response received - {msg}."
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)
@@ -786,7 +800,7 @@ async def handle_fgi_response(ctx: Context, sender: str, msg: FGIResponse):
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
-    rp = f"FGI Agent response: {msg}."
+    rp = f"FGI Agent: Response received - {msg}."
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)
@@ -808,7 +822,7 @@ async def handle_fgi_response(ctx: Context, sender: str, msg: FGIResponse):
     prompt = f'''Consider the following factors: Fear Greed Index Analysis - {asi_fgi}; Coin Market Data - {asi_coininfo}; Blockchain network - {asi_network}; User type of investing - {asi_investortype}; User risk strategy - {asi_riskstrategy}; Most recent crypto news - {asi_cryptonews}; User opinion - {asi_userreason}; '''
     context1 = '''You are a crypto expert, who is assisting the user to make the most meaningful decisions, to gain the most revenue.  Given the following information, respond with decision of either SELL, BUY or HOLD native token from given network. Inlcude your reasoning based on the analysed data and personal thoughts. Consider that the user cannot provide additional information. You could point out to questions which could help you making a solid decision.'''
     
-    ctx.storage.set("ASI_COUNTER",4)
+    ctx.storage.set("ASI_COUNTER",3)
     
     try:
         await ctx.send(REASON_AGENT,ContextPrompt(context=context1, text=prompt))
@@ -846,7 +860,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
     asi_userreason = ctx.storage.get("USERINPUT_REASON")
 
 
-    rp = f"Iteration {asi_counter}. Reason Agent response: {msg.text}."
+    rp = f"Reason Agent: Iteration {asi_counter}. Response received - {msg.text}."
     #ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)
@@ -900,7 +914,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
             return
 
     else:
-        rp = f"Reason Agent iterations completed."
+        rp = f"Reason Agent: Iterations completed!"
         ctx.logger.info(rp)
         if session_sender is not None:
             await ctx.send(session_sender, create_text_chat(rp),)
@@ -912,7 +926,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                 signal=""
                 
                 if "BUY" in msg.text:
-                    rp = f"🚨 BUY SIGNAL DETECTED!"
+                    rp = f"Reason agent: 🚨 BUY SIGNAL DETECTED!"
                     ctx.logger.info(rp)
                     if session_sender is not None:
                         await ctx.send(session_sender, create_text_chat(rp),)
@@ -923,7 +937,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                     amountt = 0.1 #usdc to eth
                 
                 elif "SELL" in msg.text:
-                    rp = f"✅ SELL SIGNAL DETECTED!"
+                    rp = f"Reason agent: ✅ SELL SIGNAL DETECTED!"
                     ctx.logger.info(rp)
                     if session_sender is not None:
                         await ctx.send(session_sender, create_text_chat(rp),)
@@ -935,7 +949,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                     amountt = 0.00007 #ETH to USDC
 
                 await ctx.send(SWAPLAND_AGENT, SwaplandRequest(blockchain=asi_network,signal=signal, private_key = asi_evmkey, amount = amountt))
-                rp = f"Request to Swapfinder Agent sent."
+                rp = f"Request to Swapland Agent sent."
                 ctx.logger.info(rp)
                 if session_sender is not None:
                     await ctx.send(session_sender, create_text_chat(rp),)
@@ -943,7 +957,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                     await ctx.send(user_sender,UserOutputResponse(response=rp),)
 
             except Exception as e:
-                rp = f"Failed to send a request to Swapfinder Agent: {e}."
+                rp = f"Failed to send a request to Swapland Agent: {e}."
                 ctx.logger.info(rp)
                 if session_sender is not None:
                     await ctx.send(session_sender, create_text_chat(rp),)
@@ -951,7 +965,7 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                     await ctx.send(user_sender,UserOutputResponse(response=rp),)
 
         elif ("HOLD" in msg.text):
-            rp = f"⏳ HOLD decision received."
+            rp = f"Reason agent: ⏳ HOLD decision received."
             ctx.logger.info(rp)
             if session_sender is not None:
                 await ctx.send(session_sender, create_text_chat(rp),)
@@ -959,7 +973,9 @@ async def handle_request(ctx: Context, sender: str, msg: Response):
                 await ctx.send(user_sender,UserOutputResponse(response=rp),)
             
             try:
-                await ctx.send(REWARD_AGENT, RewardRequest(wallet_address =str(agent2.wallet.address()),status="reward"))
+                userwal = ctx.storage.get("USERINPUT_ASIWALLET_ADDRESS")#str(agent2.wallet.address())
+
+                await ctx.send(REWARD_AGENT, RewardRequest(wallet_address = str(agent2.wallet.address()),status="reward"))
             except Exception as e:
                 ctx.logger.error(f"Failed to send request for reward: {e}.")
         else:
@@ -979,7 +995,7 @@ async def dispatcher_handler(ctx: Context, sender: str, msg: SwaplandResponse):
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
-    rp = f"Swapland Agent: {msg.status}"
+    rp = f"Swapland Agent: Response received - {msg.status}."
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)
@@ -994,7 +1010,7 @@ async def swapcomp_handler(ctx: Context, sender: str, msg: SwapCompleted):
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
     if (msg.status == "success"):
-        rp = f"Swap agent: {msg.status}. {msg.message}. {msg.transaction}"
+        rp = f"Swap agent: {msg.status}. {msg.message} . {msg.transaction} ."
         ctx.logger.info(rp)
         if session_sender is not None:
             await ctx.send(session_sender, create_text_chat(rp),)
@@ -1003,6 +1019,7 @@ async def swapcomp_handler(ctx: Context, sender: str, msg: SwapCompleted):
 
 
         try:
+            userwal = ctx.storage.get("USERINPUT_ASIWALLET_ADDRESS")#str(agent2.wallet.address())
             await ctx.send(REWARD_AGENT, RewardRequest(wallet_address=str(agent2.wallet.address()),status="reward"))
         except Exception as e:
             rp = f"Failed to send request for reward: {e}"
@@ -1027,7 +1044,7 @@ async def confirm_transaction(ctx: Context, sender: str, msg: TransactionInfo):
     session_sender = ctx.storage.get(str(ctx.session))
     user_sender = ctx.storage.get("SENDER_ADDRESS")
 
-    rp = f"Received transaction info from {sender}: {msg}"
+    rp = f"Swapland Agent: Received transaction info from {sender}: {msg}"
     ctx.logger.info(rp)
     if session_sender is not None:
         await ctx.send(session_sender, create_text_chat(rp),)

@@ -1,5 +1,3 @@
-#agent1q2ecqwzeevp5dkqye98rned02guyfzdretw5urh477pnmt6vja4psnu3esh av
-#agent1qfyrgg8w5pln25a6hcu3a3rx534lhs32aryqr5gx08djdclakzuex98dwzn mailbox
 from datetime import datetime
 from uuid import uuid4
 from uagents import Agent, Protocol, Context, Model, Field
@@ -28,15 +26,15 @@ from uagents_core.contrib.protocols.chat import (
 
 load_dotenv()
 # Ensure API key is loaded
-CMC_API_KEY = os.getenv("CMC_API_KEY")
+CMC_API_KEY = "09ff35a0-3123-438a-98aa-68e0b56380bf"#os.getenv("CMC_API_KEY")
 if not CMC_API_KEY:
     logging.error("❌ CMC_API_KEY is not set. Please set it in environment variables.")
     sys.exit(1)
 
 #FGI_SEED = os.getenv("FGI_SEED")
 #if not FGI_SEED:
-#    logging.error("❌ FGI_SEED is not set. Please set it in environment variables.")
 #    sys.exit(1)
+#    logging.error("❌ FGI_SEED is not set. Please set it in environment variables.")
 
 # Configure Logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")

@@ -50,6 +50,9 @@ class RewardResponse(Model):
     )
 
 class RewardRequest(Model):
+    wallet_address: str = Field(
+        description="wallet to receive the reward",
+    )
     status: str = Field(
         description="user requesting reward",
     )
@@ -63,7 +66,7 @@ class TransactionInfo(Model):
     tx_hash: str
 
 class PaymentInquiry(Model):
-    ready: str
+    status: str
  
 class PaymentReceived(Model):
     status: str
@@ -200,7 +203,7 @@ async def handle_structured_output_response(
 @proto.on_message(model=PaymentInquiry)
 async def send_payment(ctx: Context, sender: str, msg: PaymentInquiry):
     ctx.logger.info(f"Received payment request from {sender}: {msg}")
-    if(msg.ready == "ready"):
+    if(msg.status == "ready"):
         await ctx.send(sender,PaymentRequest(wallet_address=str(reward.wallet.address()), amount=AMOUNT, denom=DENOM))#str(ctx.agent.address)
 
 
@@ -237,7 +240,7 @@ async def confirm_transaction(ctx: Context, sender: str, msg: TransactionInfo):
     ctx.logger.info(f"Received fees have been successfully staked.")
     ctx.logger.info(f"Staked: {totalstaked} TESTFET")
     agent_balance = (ledger.query_bank_balance(Address(reward.wallet.address())))/ONETESTFET
-    ctx.logger.info(f"Available balance after stacking: {agent_balance} TESTFET")
+    ctx.logger.info(f"Available balance after staking: {agent_balance} TESTFET")
 
 
 #main agent completed execution and requests the reward
@@ -247,7 +250,7 @@ async def request_reward(ctx: Context, sender: str, msg: RewardRequest):
     if msg.status == "reward":
         check = ctx.storage.get("{ctx.agent.address}")
         if (check['agent_address'] == sender):
-            transaction = ctx.ledger.send_tokens("fetch1p78qz25eeycnwvcsksc4s7qp7232uautlwq2pf", REWARD, DENOM, reward.wallet)#send the reward
+            transaction = ctx.ledger.send_tokens(msg.wallet_address, REWARD, DENOM, reward.wallet)#send the reward
             await ctx.send(sender, TransactionInfo(tx_hash=transaction.tx_hash))#str(ctx.agent.address)
 
             ctx.logger.info(f"Reward has been issued!")

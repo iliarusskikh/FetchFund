@@ -62,7 +62,7 @@ class Response(Model):
 
 
 class HeartbeatRequest(Model):
-    hbdata: str = Field(
+    hbdata: dict[str, Any] = Field(
         description="heartbeat data sent by user",
     )
 
