@@ -85,6 +85,17 @@ After running these commands, you can access:
 
 ## Usage Guide
 
+1. The following agents need to be launched locally:
+    cryptonews_agent_av.py
+    buybase_agent_av.py
+    sellbase_agent_av.py
+2. Navigate to UserInput agent on agentverse, open the chat, 
+and enter the prompt with parameters.
+
+3. 
+
+
+
 1. Access the web application at `http://localhost:3000`
 2. Navigate to the Trade page
 3. Fill in your trading parameters:

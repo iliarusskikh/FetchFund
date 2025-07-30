@@ -2,3 +2,6 @@
 **.env
 **.DS_Store
 agentverse/.env.save
+__pycache__
+private_keys.json
+**.venv
